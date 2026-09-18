@@ -251,6 +251,33 @@ that prove the central claim, so they earn their runtime.
 
 ---
 
+## Tried and rejected: a vendored Swift Testing skill
+
+One plausible reading of the failures here is that they are gaps in framework
+knowledge rather than missing context — the model knows the code under test and
+still writes Swift Testing wrongly. That reading is why this app's prompt carries a
+framework-mechanics section and a worked example at all.
+
+Vendoring curated Swift Testing reference documents into the prompt follows from
+the same reading, so it was worth trying. It was measured and **did not help**, on
+`qwen3-coder:30b` against a throwing subject with a protocol dependency, three runs
+per condition:
+
+| Prompt | Compiled | Passed |
+|---|---|---|
+| Mechanics section + vendored reference | 3/3 | 0/3 |
+| Mechanics section only | 2/3 | 0/3 |
+| Vendored reference only, mechanics removed | 1/3 | 0/3 |
+
+The reference could not replace the hand-written section — it was worse at
+producing code that compiles. A general reference teaches a framework; the
+mechanics section targets the specific mistakes this task actually produces, which
+were found by running it. Adding both costs around 7KB of prompt for no measured
+gain, so it isn't shipped.
+
+Small sample, one model, one subject — enough to decline, not enough to conclude a
+stronger model wouldn't benefit.
+
 ## What I'd add next
 
 In rough order of what I'd actually reach for:
