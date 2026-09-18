@@ -13,7 +13,8 @@ public enum PackageInspectionError: LocalizedError, Sendable, Equatable {
     case xcodeProjectUnsupported(URL)
     case noSourcesDirectory(URL)
     case noSourceFiles(URL)
-    case noTestTarget(packageName: String)
+    case noTestTarget(packageName: String, nestedPackages: [String])
+    case manifestRejected(reason: String)
     case testDirectoryMissing(targetName: String)
     case unreadableManifest(String)
 
@@ -29,8 +30,12 @@ public enum PackageInspectionError: LocalizedError, Sendable, Equatable {
             "\(url.lastPathComponent) has a Package.swift but no Sources/ directory."
         case .noSourceFiles(let url):
             "No Swift files found under \(url.lastPathComponent)/Sources that aren't already tests."
-        case .noTestTarget(let packageName):
+        case .noTestTarget(let packageName, let nested) where !nested.isEmpty:
+            "\(packageName) has no test target of its own, but it contains \(nested.count) package\(nested.count == 1 ? "" : "s"): \(nested.joined(separator: ", ")). Open one of those instead."
+        case .noTestTarget(let packageName, _):
             "\(packageName) has no test target. SwiftTestLab won't create one for you — add a .testTarget to Package.swift and a Tests/ directory first."
+        case .manifestRejected(let reason):
+            "SwiftPM couldn't read this Package.swift: \(reason)"
         case .testDirectoryMissing(let targetName):
             "The manifest declares a test target named \(targetName), but its directory under Tests/ doesn't exist."
         case .unreadableManifest(let reason):
@@ -43,7 +48,7 @@ public enum PackageInspectionError: LocalizedError, Sendable, Equatable {
 public struct PackageInspector: Sendable {
     public init() {}
 
-    public func inspect(folder: URL) throws -> SwiftPackage {
+    public func inspect(folder: URL) async throws -> SwiftPackage {
         let fileManager = FileManager.default
         let root = folder.resolvingSymlinksInPath().standardizedFileURL
 
@@ -68,15 +73,19 @@ public struct PackageInspector: Sendable {
             throw PackageInspectionError.unreadableManifest(error.localizedDescription)
         }
 
-        let packageName = Self.packageName(in: manifest) ?? root.lastPathComponent
+        // SwiftPM's own reading of the manifest, when it can be had. The textual
+        // parse below is a fallback for when the toolchain isn't reachable.
+        let dump = try await PackageDumpLoader.dump(at: root)
+
+        let packageName = dump?.name ?? Self.packageName(in: manifest) ?? root.lastPathComponent
 
         let sourcesDirectory = root.appending(path: "Sources")
-        guard fileManager.fileExists(atPath: sourcesDirectory.path(percentEncoded: false)) else {
+        guard dump != nil || fileManager.fileExists(atPath: sourcesDirectory.path(percentEncoded: false)) else {
             throw PackageInspectionError.noSourcesDirectory(folder)
         }
 
         let sourceFiles = Self.sourceFiles(
-            under: sourcesDirectory,
+            for: dump,
             packageRoot: root,
             packageName: packageName
         )
@@ -84,11 +93,28 @@ public struct PackageInspector: Sendable {
             throw PackageInspectionError.noSourceFiles(folder)
         }
 
-        guard let testTargetName = Self.firstTestTargetName(in: manifest) else {
-            throw PackageInspectionError.noTestTarget(packageName: packageName)
+        let testTargetName: String
+        if let dump {
+            guard let target = dump.testTargets.first else {
+                throw PackageInspectionError.noTestTarget(
+                    packageName: packageName,
+                    nestedPackages: Self.nestedPackages(in: root, fileManager: fileManager)
+                )
+            }
+            testTargetName = target.name
+        } else if let name = Self.firstTestTargetName(in: manifest) {
+            testTargetName = name
+        } else {
+            throw PackageInspectionError.noTestTarget(
+                packageName: packageName,
+                nestedPackages: Self.nestedPackages(in: root, fileManager: fileManager)
+            )
         }
+
+        let declaredPath = dump?.testTargets.first?.path
         guard let testDirectory = Self.testDirectory(
             named: testTargetName,
+            declaredPath: declaredPath,
             packageRoot: root,
             fileManager: fileManager
         ) else {
@@ -142,8 +168,36 @@ public struct PackageInspector: Sendable {
         return entries.contains { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }
     }
 
-    /// Every `.swift` file under `Sources/` that isn't itself a test.
-    static func sourceFiles(under sourcesDirectory: URL, packageRoot: URL, packageName: String) -> [SourceFile] {
+    /// Source files from the targets SwiftPM reports, falling back to `Sources/`.
+    static func sourceFiles(for dump: PackageDump?, packageRoot: URL, packageName: String) -> [SourceFile] {
+        guard let dump else {
+            return sourceFiles(
+                under: packageRoot.appending(path: "Sources"),
+                packageRoot: packageRoot,
+                packageName: packageName
+            )
+        }
+
+        var files: [SourceFile] = []
+        for target in dump.sourceTargets {
+            let directory = packageRoot.appending(path: target.path ?? "Sources/\(target.name)")
+            files += sourceFiles(
+                under: directory,
+                packageRoot: packageRoot,
+                packageName: packageName,
+                moduleName: target.name
+            )
+        }
+        return files.sorted { $0.relativePath.localizedStandardCompare($1.relativePath) == .orderedAscending }
+    }
+
+    /// Every `.swift` file under a directory that isn't itself a test.
+    static func sourceFiles(
+        under sourcesDirectory: URL,
+        packageRoot: URL,
+        packageName: String,
+        moduleName: String? = nil
+    ) -> [SourceFile] {
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: sourcesDirectory,
@@ -166,7 +220,8 @@ public struct PackageInspector: Sendable {
                 SourceFile(
                     url: url.resolvingSymlinksInPath().standardizedFileURL,
                     relativePath: relativePath,
-                    moduleName: moduleName(forRelativePath: relativePath, packageName: packageName)
+                    moduleName: moduleName
+                        ?? self.moduleName(forRelativePath: relativePath, packageName: packageName)
                 )
             )
         }
@@ -181,7 +236,34 @@ public struct PackageInspector: Sendable {
         return String(components[1])
     }
 
-    private static func testDirectory(named targetName: String, packageRoot: URL, fileManager: FileManager) -> URL? {
+    /// Every directory directly inside `root` that is itself a package.
+    static func nestedPackages(in root: URL, fileManager: FileManager) -> [String] {
+        let entries = (try? fileManager.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return entries
+            .filter {
+                fileManager.fileExists(
+                    atPath: $0.appending(path: "Package.swift").path(percentEncoded: false)
+                )
+            }
+            .map(\.lastPathComponent)
+            .sorted()
+    }
+
+    private static func testDirectory(
+        named targetName: String,
+        declaredPath: String?,
+        packageRoot: URL,
+        fileManager: FileManager
+    ) -> URL? {
+        // A target may declare its own path; that beats any convention.
+        if let declaredPath {
+            let declared = packageRoot.appending(path: declaredPath)
+            if fileManager.fileExists(atPath: declared.path(percentEncoded: false)) { return declared }
+        }
         let testsRoot = packageRoot.appending(path: "Tests")
         let byName = testsRoot.appending(path: targetName)
         if fileManager.fileExists(atPath: byName.path(percentEncoded: false)) { return byName }

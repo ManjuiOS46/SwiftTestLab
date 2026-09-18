@@ -10,34 +10,34 @@ import Testing
 @testable import SwiftTestLabKit
 
 @Suite struct PackageInspectorTests {
-    @Test func rejectsAFolderWithoutAManifest() throws {
+    @Test func rejectsAFolderWithoutAManifest() async throws {
         let fixture = try Fixture()
-        #expect(throws: PackageInspectionError.notASwiftPackage(fixture.root)) {
-            try PackageInspector().inspect(folder: fixture.root)
+        await #expect(throws: PackageInspectionError.notASwiftPackage(fixture.root)) {
+            try await PackageInspector().inspect(folder: fixture.root)
         }
     }
 
-    @Test func namesXcodeProjectsAsOutOfScopeRatherThanJustUnrecognised() throws {
+    @Test func namesXcodeProjectsAsOutOfScopeRatherThanJustUnrecognised() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("App.xcodeproj")
-        #expect(throws: PackageInspectionError.xcodeProjectUnsupported(fixture.root)) {
-            try PackageInspector().inspect(folder: fixture.root)
+        await #expect(throws: PackageInspectionError.xcodeProjectUnsupported(fixture.root)) {
+            try await PackageInspector().inspect(folder: fixture.root)
         }
     }
 
-    @Test func reportsAMissingTestTargetByName() throws {
+    @Test func reportsAMissingTestTargetByName() async throws {
         let fixture = try Fixture()
         try fixture.write("Package.swift", Fixture.manifest(includeTestTarget: false))
         try fixture.write("Sources/Widgets/Slider.swift", "struct Slider {}")
 
-        #expect(throws: PackageInspectionError.noTestTarget(packageName: "Widgets")) {
-            try PackageInspector().inspect(folder: fixture.root)
+        await #expect(throws: PackageInspectionError.noTestTarget(packageName: "Widgets", nestedPackages: [])) {
+            try await PackageInspector().inspect(folder: fixture.root)
         }
     }
 
-    @Test func listsSourcesAndSkipsExistingTests() throws {
+    @Test func listsSourcesAndSkipsExistingTests() async throws {
         let fixture = try makeCompletePackage()
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
 
         let paths = package.sourceFiles.map(\.relativePath)
         #expect(paths.contains("Sources/Widgets/Slider.swift"))
@@ -46,26 +46,26 @@ import Testing
         #expect(!paths.contains { $0.contains(".build") })
     }
 
-    @Test func infersSwiftTestingFromTheExistingTests() throws {
+    @Test func infersSwiftTestingFromTheExistingTests() async throws {
         let fixture = try makeCompletePackage()
         try fixture.write("Tests/WidgetsTests/DialTests.swift", "import Testing\n")
 
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         #expect(package.testTarget.framework == .swiftTesting)
         #expect(package.testTarget.relativeDirectory == "Tests/WidgetsTests")
     }
 
-    @Test func infersXCTestFromTheExistingTests() throws {
+    @Test func infersXCTestFromTheExistingTests() async throws {
         let fixture = try makeCompletePackage()
         try fixture.write("Tests/WidgetsTests/DialTests.swift", "import XCTest\n")
 
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         #expect(package.testTarget.framework == .xctest)
     }
 
-    @Test func fallsBackToTheToolsVersionWhenThereAreNoTestsToLearnFrom() throws {
+    @Test func fallsBackToTheToolsVersionWhenThereAreNoTestsToLearnFrom() async throws {
         let fixture = try makeCompletePackage()
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         #expect(package.testTarget.framework == .swiftTesting)
         #expect(package.testTarget.frameworkEvidence.contains("swift-tools-version"))
     }

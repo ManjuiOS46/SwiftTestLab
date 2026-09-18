@@ -141,6 +141,8 @@ final class AppModel {
     /// Kept beside the output rather than thrown in an alert, so a failed run
     /// leaves everything it produced on screen instead of wiping it.
     private(set) var runError: String?
+    /// Reading a manifest means running SwiftPM, which isn't instant.
+    private(set) var isInspecting = false
 
     var showingPromptPreview = false
     var showingDiff = false
@@ -278,15 +280,19 @@ final class AppModel {
         panel.message = "Choose a folder with a Package.swift at its root."
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
-        do {
-            let package = try inspector.inspect(folder: url)
-            workspace = .package(package)
-            selectedFile = nil
-            fileFilter = ""
-            errorMessage = nil
-            resetRun()
-        } catch {
-            errorMessage = error.localizedDescription
+        isInspecting = true
+        Task { [self] in
+            defer { isInspecting = false }
+            do {
+                let package = try await inspector.inspect(folder: url)
+                workspace = .package(package)
+                selectedFile = nil
+                fileFilter = ""
+                errorMessage = nil
+                resetRun()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

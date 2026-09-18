@@ -15,7 +15,7 @@ import Testing
 @Suite struct VerificationIntegrationTests {
     @Test func aGoodTestCompilesPassesAndNeverTouchesTheRealPackage() async throws {
         let fixture = try Fixture.widgetsPackage()
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         let subject = TestSubject.inPackage(
             package: package,
             file: try #require(package.sourceFiles.first)
@@ -50,7 +50,7 @@ import Testing
 
     @Test func aTestThatDoesNotCompileIsReportedAsSuch() async throws {
         let fixture = try Fixture.widgetsPackage()
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         let subject = TestSubject.inPackage(
             package: package,
             file: try #require(package.sourceFiles.first)
@@ -132,7 +132,7 @@ import Testing
 
     @Test func cancellingLeavesNoProcessRunningAndNothingOnDisk() async throws {
         let fixture = try Fixture.widgetsPackage()
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         let subject = TestSubject.inPackage(
             package: package,
             file: try #require(package.sourceFiles.first)

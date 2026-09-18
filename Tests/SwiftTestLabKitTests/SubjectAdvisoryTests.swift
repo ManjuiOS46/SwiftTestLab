@@ -19,7 +19,7 @@ import Testing
         )
     }
 
-    @Test func warnsWhenALooseFileImportsUIKit() throws {
+    @Test func warnsWhenALooseFileImportsUIKit() async throws {
         let (fixture, subject) = try standalone("import UIKit\nclass Screen: UIViewController {}")
         let source = try subject.source()
 
@@ -28,7 +28,7 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 
-    @Test func warnsAboutIOSOnlySwiftUIEvenWithoutAUIKitImport() throws {
+    @Test func warnsAboutIOSOnlySwiftUIEvenWithoutAUIKitImport() async throws {
         let (fixture, subject) = try standalone("""
         import SwiftUI
 
@@ -47,7 +47,7 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 
-    @Test func warnsThatAViewIsAThinSubject() throws {
+    @Test func warnsThatAViewIsAThinSubject() async throws {
         let (fixture, subject) = try standalone("""
         import SwiftUI
 
@@ -62,7 +62,7 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 
-    @Test func saysNothingAboutOrdinaryLogic() throws {
+    @Test func saysNothingAboutOrdinaryLogic() async throws {
         let (fixture, subject) = try standalone("""
         struct Pricer {
             func total(of values: [Int]) -> Int { values.reduce(0, +) }
@@ -74,10 +74,10 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 
-    @Test func aFileInsideAPackageIsNotWarnedAboutPlatformMismatch() throws {
+    @Test func aFileInsideAPackageIsNotWarnedAboutPlatformMismatch() async throws {
         let fixture = try Fixture.widgetsPackage()
         try fixture.write("Sources/Widgets/Screen.swift", "import UIKit\nclass Screen {}")
-        let package = try PackageInspector().inspect(folder: fixture.root)
+        let package = try await PackageInspector().inspect(folder: fixture.root)
         let file = try #require(package.sourceFiles.first { $0.fileName == "Screen.swift" })
         let subject = TestSubject.inPackage(package: package, file: file)
 
