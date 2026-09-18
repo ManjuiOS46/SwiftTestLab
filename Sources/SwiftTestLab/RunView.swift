@@ -107,8 +107,34 @@ struct RunView: View {
                 ProviderChip()
             }
             StageTrack(states: stages)
+            if let location = locationLine {
+                Text(location)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
         }
         .padding(16)
+    }
+
+    /// Where the file is right now, and where it would go — the two things people
+    /// ask about a generated file.
+    private var locationLine: String? {
+        if let accepted = model.acceptedURL {
+            return "Written to \(accepted.path(percentEncoded: false))"
+        }
+        if model.generatedTest != nil {
+            if let destination = model.destinationPath {
+                return "Not written yet · Accept would write it to \(destination)"
+            }
+            return "Not written yet · Accept asks you where to save it"
+        }
+        if let scratch = model.scratchPath {
+            return "Building in \(scratch)"
+        }
+        return nil
     }
 
     private var stages: [(title: String, state: StageTrack.State)] {
@@ -152,6 +178,8 @@ struct RunView: View {
                 Button("Try Again") { model.resetRun() }
                     .controlSize(.large)
                     .buttonStyle(.borderedProminent)
+                Button("Copy Test") { model.copyTestToClipboard() }
+                    .disabled(model.generatedTest == nil)
                 Text("What was generated is still above — nothing was written to your files.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -170,6 +198,8 @@ struct RunView: View {
                             .disabled(!model.canAccept)
                     }
                 }
+                Button("Copy Test") { model.copyTestToClipboard() }
+                    .disabled(model.generatedTest == nil)
                 Button("Start Over") { model.resetRun() }
                 if !model.canAccept {
                     Text("A test that doesn't compile is never written.")

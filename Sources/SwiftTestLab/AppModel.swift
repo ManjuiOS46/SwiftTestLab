@@ -138,6 +138,9 @@ final class AppModel {
     private(set) var report: VerificationReport?
     private(set) var stage: VerificationStage?
     private(set) var acceptedURL: URL?
+    /// Where verification happened, kept for display: people reasonably want to
+    /// know where the thing they just watched being built actually lives.
+    private(set) var scratchPath: String?
     /// Kept beside the output rather than thrown in an alert, so a failed run
     /// leaves everything it produced on screen instead of wiping it.
     private(set) var runError: String?
@@ -166,6 +169,19 @@ final class AppModel {
     var destinationDescription: String? {
         guard let subject, let test = generatedTest else { return nil }
         return subject.destinationDescription(forTestFileNamed: test.fileName)
+    }
+
+    /// The absolute path the file would land at, or nil when you'd be asked.
+    var destinationPath: String? {
+        guard let subject, let test = generatedTest else { return nil }
+        return subject.destination(forTestFileNamed: test.fileName)?
+            .path(percentEncoded: false)
+    }
+
+    func copyTestToClipboard() {
+        guard let test = generatedTest else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(test.source, forType: .string)
     }
 
     var diffLines: [DiffLine] {
@@ -395,6 +411,7 @@ final class AppModel {
 
             let scratch = try sandboxBuilder.make(for: subject, generatedTest: test)
             sandbox = scratch
+            scratchPath = scratch.packageRoot.path(percentEncoded: false)
             buildLog = "Scratch copy at \(scratch.packageRoot.path(percentEncoded: false))\n\n"
 
             report = try await verifier.verify(

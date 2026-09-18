@@ -14,28 +14,43 @@ struct WorkspaceSidebar: View {
     var body: some View {
         @Bindable var model = model
 
-        VStack(spacing: 0) {
+        Group {
             switch model.workspace {
             case .package(let package):
-                PackageHeader(package: package)
-                Divider()
-                List(model.visibleFiles, id: \.self, selection: $model.selectedFile) { file in
-                    FileRow(file: file)
-                        .tag(file)
+                // One List, header included: a VStack wrapping a List scrolls its
+                // own content up under the title bar instead of insetting for it.
+                List(selection: $model.selectedFile) {
+                    Section {
+                        PackageHeader(package: package)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 10, trailing: 6))
+                    }
+                    Section("Files") {
+                        ForEach(model.visibleFiles, id: \.self) { file in
+                            FileRow(file: file).tag(file)
+                        }
+                    }
                 }
                 .listStyle(.sidebar)
                 .searchable(text: $model.fileFilter, placement: .sidebar, prompt: "Filter files")
 
             case .file(let file):
-                StandaloneHeader(file: file)
-                Spacer()
+                List {
+                    Section {
+                        StandaloneHeader(file: file)
+                            .listRowSeparator(.hidden)
+                    }
+                }
+                .listStyle(.sidebar)
 
             case nil:
-                Spacer()
-                Text("Nothing open")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                Spacer()
+                VStack {
+                    Spacer()
+                    Text("Nothing open")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                }
             }
         }
     }
@@ -78,10 +93,7 @@ private struct PackageHeader: View {
             }
 
             HStack(spacing: 6) {
-                StatusPill(
-                    text: "\(package.sourceFiles.count) files",
-                    tint: .secondary
-                )
+                StatusPill(text: "\(package.sourceFiles.count) files", tint: .secondary)
                 StatusPill(
                     text: package.testTarget.framework.displayName,
                     tint: .accentColor,
@@ -96,7 +108,6 @@ private struct PackageHeader: View {
                 .lineLimit(1)
                 .truncationMode(.head)
         }
-        .padding(12)
     }
 }
 
@@ -132,6 +143,5 @@ private struct StandaloneHeader: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
     }
 }

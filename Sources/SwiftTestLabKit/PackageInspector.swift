@@ -131,7 +131,8 @@ public struct PackageInspector: Sendable {
             directory: testDirectory,
             relativeDirectory: Self.relativePath(of: testDirectory, from: root),
             framework: framework,
-            frameworkEvidence: evidence
+            frameworkEvidence: evidence,
+            dependencyNames: dump?.testTargets.first?.dependencyNames ?? []
         )
 
         return SwiftPackage(

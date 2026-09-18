@@ -87,3 +87,43 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 }
+
+@Suite struct TestTargetReachabilityTests {
+    @Test func warnsWhenTheTestTargetCannotImportTheChosenModule() async throws {
+        let fixture = try Fixture()
+        try fixture.write("Package.swift", """
+        // swift-tools-version: 6.0
+        import PackageDescription
+
+        let package = Package(
+            name: "Split",
+            targets: [
+                .target(name: "Kit"),
+                .executableTarget(name: "App", dependencies: ["Kit"]),
+                .testTarget(name: "KitTests", dependencies: ["Kit"]),
+            ]
+        )
+        """)
+        try fixture.write("Sources/Kit/Engine.swift", "public struct Engine {}")
+        try fixture.write("Sources/App/main.swift", "print(\"hi\")")
+        try fixture.makeDirectory("Tests/KitTests")
+
+        let package = try await PackageInspector().inspect(folder: fixture.root)
+        #expect(package.testTarget.dependencyNames.contains("Kit"))
+
+        let appFile = try #require(package.sourceFiles.first { $0.moduleName == "App" })
+        let unreachable = SubjectAdvisory.warnings(
+            for: .inPackage(package: package, file: appFile),
+            source: "print(\"hi\")"
+        )
+        #expect(unreachable.contains { $0.contains("doesn't depend on App") })
+
+        let kitFile = try #require(package.sourceFiles.first { $0.moduleName == "Kit" })
+        let reachable = SubjectAdvisory.warnings(
+            for: .inPackage(package: package, file: kitFile),
+            source: "public struct Engine {}"
+        )
+        #expect(!reachable.contains { $0.contains("doesn't depend on") })
+        withExtendedLifetime(fixture) {}
+    }
+}

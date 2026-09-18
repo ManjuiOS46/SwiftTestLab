@@ -60,19 +60,24 @@ public struct TestTargetInfo: Sendable, Hashable {
     public let framework: TestFramework
     /// How the framework was decided, shown in the UI so the choice isn't a black box.
     public let frameworkEvidence: String
+    /// Modules this test target can import. A file outside them can't be tested
+    /// here, however good the generated test is.
+    public let dependencyNames: [String]
 
     public init(
         name: String,
         directory: URL,
         relativeDirectory: String,
         framework: TestFramework,
-        frameworkEvidence: String
+        frameworkEvidence: String,
+        dependencyNames: [String] = []
     ) {
         self.name = name
         self.directory = directory
         self.relativeDirectory = relativeDirectory
         self.framework = framework
         self.frameworkEvidence = frameworkEvidence
+        self.dependencyNames = dependencyNames
     }
 }
 

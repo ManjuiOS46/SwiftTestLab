@@ -18,9 +18,53 @@ struct PackageDump: Decodable {
         let name: String
         let type: String
         let path: String?
+        /// Every name mentioned in the target's dependencies, however it was written
+        /// (`byName`, `.target`, `.product`). Enough to answer "can this target see
+        /// that module", which is all we need it for.
+        let dependencyNames: [String]
 
         var isTest: Bool { type == "test" }
         var isSource: Bool { type == "regular" || type == "executable" || type == "macro" }
+
+        private enum CodingKeys: String, CodingKey { case name, type, path, dependencies }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            type = try container.decode(String.self, forKey: .type)
+            path = try container.decodeIfPresent(String.self, forKey: .path)
+            let dependencies = try container.decodeIfPresent(JSONValue.self, forKey: .dependencies)
+            dependencyNames = dependencies?.strings ?? []
+        }
+    }
+
+    /// Just enough JSON to pull the strings out of a shape that varies.
+    private enum JSONValue: Decodable {
+        case string(String)
+        case array([JSONValue])
+        case object([String: JSONValue])
+        case other
+
+        init(from decoder: Decoder) throws {
+            if let value = try? decoder.singleValueContainer().decode(String.self) {
+                self = .string(value)
+            } else if let value = try? decoder.singleValueContainer().decode([JSONValue].self) {
+                self = .array(value)
+            } else if let value = try? decoder.singleValueContainer().decode([String: JSONValue].self) {
+                self = .object(value)
+            } else {
+                self = .other
+            }
+        }
+
+        var strings: [String] {
+            switch self {
+            case .string(let value): [value]
+            case .array(let values): values.flatMap(\.strings)
+            case .object(let values): values.values.flatMap(\.strings)
+            case .other: []
+            }
+        }
     }
 
     let name: String

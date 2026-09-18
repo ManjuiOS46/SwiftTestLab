@@ -14,6 +14,17 @@ public enum SubjectAdvisory {
     public static func warnings(for subject: TestSubject, source: String) -> [String] {
         var warnings: [String] = []
 
+        if case .inPackage(let package, let file) = subject {
+            let reachable = package.testTarget.dependencyNames
+            if !reachable.isEmpty && !reachable.contains(file.moduleName) {
+                warnings.append(
+                    "The \(package.testTarget.name) target doesn't depend on \(file.moduleName), "
+                    + "so it can't import it. This test won't compile until "
+                    + "\(file.moduleName) is added to that target's dependencies in Package.swift."
+                )
+            }
+        }
+
         if case .standalone = subject {
             if source.contains(/^\s*import\s+(UIKit|WatchKit)\b/.anchorsMatchLineEndings()) {
                 warnings.append(
