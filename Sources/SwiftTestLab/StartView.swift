@@ -69,8 +69,11 @@ struct StartView: View {
             }
             .frame(maxWidth: 780, alignment: .leading)
             .padding(36)
-            .frame(maxWidth: .infinity, alignment: .center)
         }
+        // The centring frame belongs on the scroll view, not on its content:
+        // `maxWidth: .infinity` inside a ScrollView makes the content's ideal
+        // width unbounded, and the window opens as wide as it is allowed to be.
+        .frame(maxWidth: .infinity, alignment: .center)
         .background(Color.canvas)
     }
 }

@@ -18,8 +18,10 @@ struct WindowBoundsLimiter: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let probe = NSView(frame: .zero)
         DispatchQueue.main.async { [weak probe] in
-            guard let window = probe?.window else { return }
-            context.coordinator.attach(to: window)
+            MainActor.assumeIsolated {
+                guard let window = probe?.window else { return }
+                context.coordinator.attach(to: window)
+            }
         }
         return probe
     }
@@ -28,7 +30,7 @@ struct WindowBoundsLimiter: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    final class Coordinator {
+    @MainActor final class Coordinator {
         private weak var window: NSWindow?
 
         init() {
@@ -40,12 +42,41 @@ struct WindowBoundsLimiter: NSViewRepresentable {
             )
         }
 
-        deinit { NotificationCenter.default.removeObserver(self) }
+        nonisolated deinit { NotificationCenter.default.removeObserver(self) }
+
+        /// What the app opens at when nothing better is remembered.
+        static let preferredSize = NSSize(width: 1_180, height: 760)
 
         func attach(to window: NSWindow) {
             self.window = window
             window.minSize = NSSize(width: 820, height: 480)
             apply()
+
+            // SwiftUI sizes a new window from its content's ideal width, and a
+            // layout containing flexible frames asks for everything available —
+            // so the window opens filling the screen. `.defaultSize` doesn't win
+            // that argument. Setting the frame once, only when there's nothing
+            // saved to restore, does.
+            guard !WindowStateRepair.hasUsableSavedFrame else { return }
+            openAtPreferredSize(window)
+        }
+
+        private func openAtPreferredSize(_ window: NSWindow) {
+            guard let screen = window.screen ?? NSScreen.main else { return }
+            let usable = screen.visibleFrame
+            let size = NSSize(
+                width: min(Self.preferredSize.width, usable.width),
+                height: min(Self.preferredSize.height, usable.height)
+            )
+            window.setFrame(
+                NSRect(
+                    x: usable.midX - size.width / 2,
+                    y: usable.midY - size.height / 2,
+                    width: size.width,
+                    height: size.height
+                ),
+                display: true
+            )
         }
 
         @objc private func screensChanged() { apply() }

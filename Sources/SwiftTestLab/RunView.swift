@@ -294,8 +294,10 @@ private struct ProblemsPane: View {
                     if diagnostic != diagnostics.last { Divider().padding(.leading, 37) }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        // Outside the scroll view: see StartView — a flexible frame on scrolled
+        // content gives it an unbounded ideal width.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.editor)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(

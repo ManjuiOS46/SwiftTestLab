@@ -21,10 +21,20 @@ import SwiftTestLabKit
 /// Runs once, before any window is created. Nothing clamps at layout time, because
 /// resizing a window from inside a layout pass just causes another layout pass.
 enum WindowStateRepair {
+    /// False on a first run, or after oversized state was thrown away. The window
+    /// then gets a sensible opening size instead of whatever its content asks for.
+    @MainActor private(set) static var hasUsableSavedFrame = false
+
+    @MainActor
     static func discardStateLargerThanTheScreen(
         defaults: UserDefaults = .standard,
         screenHeight: Double? = nil
     ) {
+        defer {
+            hasUsableSavedFrame = defaults.dictionaryRepresentation().keys
+                .contains { $0.hasPrefix("NSWindow Frame") }
+        }
+
         let limit = screenHeight ?? Double(NSScreen.screens.map(\.frame.height).max() ?? 1_080)
 
         for (key, value) in defaults.dictionaryRepresentation() {
