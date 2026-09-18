@@ -66,8 +66,11 @@ detects whether your existing tests use Swift Testing or XCTest and instructs th
 model to match, and can write an accepted test straight into `Tests/YourTests/`.
 
 **Single-file mode** takes any `.swift` file on its own. SwiftPM can't build a loose
-file, so verifying one means wrapping it in a throwaway package — your file as a
-module named `Subject`, the generated test as its test target — and building that.
+file, so verifying one means wrapping it in a throwaway package and building that.
+The throwaway module takes its name from the file's own location — a file under
+`Sources/PixiiCloneApp/` is built as module `PixiiCloneApp` — so the generated test
+imports a name that exists in your project rather than one invented for the scratch
+build. A file with no `Sources/` directory above it falls back to `Subject`.
 That works when the file stands on its own, and **fails honestly when it doesn't**:
 a file that needs types from the rest of its project won't compile, and the
 Problems list will say which symbol is missing. Accepting in this mode is a Save As,

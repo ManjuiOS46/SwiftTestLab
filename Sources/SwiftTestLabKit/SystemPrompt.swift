@@ -182,10 +182,10 @@ public struct PromptBuilder: Sendable {
             File: \(file.fileName)
 
             This file is being tested on its own. It is compiled as the only file in a \
-            module named `\(StandaloneFile.moduleName)`, with no access to the rest of the \
+            module named `\(file.moduleName)`, with no access to the rest of the \
             project it came from, so use only what this file and the Swift standard \
             library or Foundation provide. The test must \
-            `@testable import \(StandaloneFile.moduleName)`.
+            `@testable import \(file.moduleName)`.
 
             Write the test file for this source:
 

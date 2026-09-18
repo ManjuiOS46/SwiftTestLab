@@ -30,8 +30,8 @@ public enum FileSelectionError: LocalizedError, Sendable, Equatable {
 /// throwaway package — see `SandboxBuilder`. That works when the file stands on
 /// its own, and fails honestly when it depends on the rest of its project.
 public struct StandaloneFile: Sendable, Identifiable, Hashable {
-    public static let moduleName = "Subject"
-    public static let testTargetName = "SubjectTests"
+    /// Used only when the file's own module can't be worked out.
+    public static let fallbackModuleName = "Subject"
 
     public let url: URL
 
@@ -59,6 +59,33 @@ public struct StandaloneFile: Sendable, Identifiable, Hashable {
     public func read() throws -> String {
         try String(contentsOf: url, encoding: .utf8)
     }
+
+    /// The module this file really belongs to, so the generated test imports a
+    /// name that exists in the user's project rather than one we invented.
+    ///
+    /// `.../Sources/PixiiCloneApp/Models.swift` is module `PixiiCloneApp`, by the
+    /// convention SwiftPM itself uses.
+    public var moduleName: String {
+        let components = url.pathComponents
+        if let sources = components.lastIndex(of: "Sources"),
+           components.index(after: sources) < components.count - 1 {
+            let candidate = components[components.index(after: sources)]
+            if let identifier = Self.asSwiftIdentifier(candidate) { return identifier }
+        }
+        return Self.fallbackModuleName
+    }
+
+    public var testTargetName: String { "\(moduleName)Tests" }
+
+    /// A module name has to be a usable Swift identifier.
+    static func asSwiftIdentifier(_ name: String) -> String? {
+        let allowed = name.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "_"
+        }
+        let cleaned = String(String.UnicodeScalarView(allowed))
+        guard let first = cleaned.first, !first.isNumber else { return nil }
+        return cleaned.isEmpty ? nil : cleaned
+    }
 }
 
 /// What a run is about: a file inside a package, or a file on its own.
@@ -84,7 +111,7 @@ public enum TestSubject: Sendable {
     public var moduleName: String {
         switch self {
         case .inPackage(_, let file): file.moduleName
-        case .standalone: StandaloneFile.moduleName
+        case .standalone(let file): file.moduleName
         }
     }
 

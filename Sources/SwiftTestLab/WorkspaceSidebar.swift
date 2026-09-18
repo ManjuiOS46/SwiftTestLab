@@ -138,7 +138,7 @@ private struct StandaloneHeader: View {
                 .lineLimit(2)
                 .truncationMode(.head)
 
-            Text("Built on its own as a module named \(StandaloneFile.moduleName). If it needs types from the rest of its project, the build will say so.")
+            Text("Built on its own as a module named \(file.moduleName). If it needs types from the rest of its project, the build will say so.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

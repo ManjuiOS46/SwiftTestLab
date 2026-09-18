@@ -89,25 +89,28 @@ public struct SandboxBuilder: Sendable {
     private func synthesise(around file: StandaloneFile, generatedTest: GeneratedTest) throws -> Sandbox {
         let fileManager = FileManager.default
         let container = Self.newContainer()
-        let packageRoot = container.appending(path: StandaloneFile.moduleName)
+        // Named after the file's own module, so the generated test imports a name
+        // that exists in the user's project rather than one we made up.
+        let packageRoot = container.appending(path: file.moduleName)
 
         do {
-            let sources = packageRoot.appending(path: "Sources/\(StandaloneFile.moduleName)")
+            let sources = packageRoot.appending(path: "Sources/\(file.moduleName)")
             try fileManager.createDirectory(at: sources, withIntermediateDirectories: true)
             try file.read().write(
                 to: sources.appending(path: file.fileName),
                 atomically: true,
                 encoding: .utf8
             )
-            try Self.synthesisedManifest.write(
-                to: packageRoot.appending(path: "Package.swift"),
-                atomically: true,
-                encoding: .utf8
-            )
+            try Self.synthesisedManifest(module: file.moduleName, tests: file.testTargetName)
+                .write(
+                    to: packageRoot.appending(path: "Package.swift"),
+                    atomically: true,
+                    encoding: .utf8
+                )
 
             let testFileURL = try write(
                 generatedTest,
-                into: packageRoot.appending(path: "Tests/\(StandaloneFile.testTargetName)")
+                into: packageRoot.appending(path: "Tests/\(file.testTargetName)")
             )
             return Sandbox(
                 container: container,
@@ -124,27 +127,29 @@ public struct SandboxBuilder: Sendable {
     /// Swift 5 language mode on purpose: a file lifted out of somebody else's
     /// project shouldn't fail to build over strict-concurrency rules its own
     /// package may not have opted into.
-    static let synthesisedManifest = """
-    // swift-tools-version: 6.0
-    import PackageDescription
+    static func synthesisedManifest(module: String, tests: String) -> String {
+        """
+        // swift-tools-version: 6.0
+        import PackageDescription
 
-    let package = Package(
-        name: "\(StandaloneFile.moduleName)",
-        platforms: [.macOS(.v14)],
-        targets: [
-            .target(
-                name: "\(StandaloneFile.moduleName)",
-                swiftSettings: [.swiftLanguageMode(.v5)]
-            ),
-            .testTarget(
-                name: "\(StandaloneFile.testTargetName)",
-                dependencies: ["\(StandaloneFile.moduleName)"],
-                swiftSettings: [.swiftLanguageMode(.v5)]
-            ),
-        ]
-    )
+        let package = Package(
+            name: "\(module)",
+            platforms: [.macOS(.v14)],
+            targets: [
+                .target(
+                    name: "\(module)",
+                    swiftSettings: [.swiftLanguageMode(.v5)]
+                ),
+                .testTarget(
+                    name: "\(tests)",
+                    dependencies: ["\(module)"],
+                    swiftSettings: [.swiftLanguageMode(.v5)]
+                ),
+            ]
+        )
 
-    """
+        """
+    }
 
     // MARK: - Shared
 
