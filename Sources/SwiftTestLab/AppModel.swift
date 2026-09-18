@@ -343,6 +343,30 @@ final class AppModel {
         }
     }
 
+    /// Opens a package given on the command line. Makes the app scriptable enough
+    /// to reproduce a layout problem without someone clicking through it.
+    func openFromCommandLine() {
+        let candidates = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("-") }
+        guard let path = candidates.first else { return }
+        let url = URL(filePath: path)
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else { return }
+
+        isInspecting = true
+        Task { [self] in
+            defer { isInspecting = false }
+            do {
+                let package = try await inspector.inspect(folder: url)
+                workspace = .package(package)
+                resetRun()
+                if CommandLine.arguments.contains("--select-first") {
+                    selectedFile = package.sourceFiles.first
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     func closeWorkspace() {
         guard !isRunning else { return }
         workspace = nil

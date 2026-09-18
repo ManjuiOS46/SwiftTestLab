@@ -26,10 +26,17 @@ struct SwiftTestLabApp: App {
         WindowGroup {
             ContentView()
                 .environment(model)
-                .task { NSApplication.shared.activate() }
+                .task {
+                    NSApplication.shared.activate()
+                    model.openFromCommandLine()
+                }
         }
         .defaultSize(width: 1_180, height: 760)
         .defaultPosition(.center)
+        // Content decides the window's *minimum* only. Under .automatic, SwiftUI
+        // resizes the window to its content's ideal size whenever that changes —
+        // which is how opening a file made the window thousands of points tall.
+        .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Swift Package…") { model.choosePackage() }

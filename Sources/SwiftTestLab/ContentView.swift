@@ -21,6 +21,12 @@ struct ContentView: View {
         } detail: {
             DetailView()
         }
+        // A floor on width matters for more than looks: SwiftUI computes the
+        // content's minimum height by proposing a width of zero, and text marked
+        // `.fixedSize(vertical:)` then wraps to one character per line and reports
+        // a minimum height of thousands of points. Giving it a real width to wrap
+        // at keeps that number sane.
+        .frame(minWidth: 900, minHeight: 500)
         .background(WindowBoundsLimiter())
         // Opaque, so scrolled content can never appear behind the window controls.
         .toolbarBackground(.visible, for: .windowToolbar)

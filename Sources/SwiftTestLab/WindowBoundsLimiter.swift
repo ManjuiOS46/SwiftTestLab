@@ -40,6 +40,21 @@ struct WindowBoundsLimiter: NSViewRepresentable {
                 name: NSApplication.didChangeScreenParametersNotification,
                 object: nil
             )
+            // The backstop. SwiftUI resizes the window programmatically, which
+            // ignores maxSize, so the only reliable guarantee is to notice it
+            // happening and undo it. Acts only when the window is too big, so it
+            // cannot fight a window that already fits.
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowResized),
+                name: NSWindow.didResizeNotification,
+                object: nil
+            )
+        }
+
+        @objc private func windowResized(_ note: Notification) {
+            guard let resized = note.object as? NSWindow, resized === window else { return }
+            apply()
         }
 
         nonisolated deinit { NotificationCenter.default.removeObserver(self) }
