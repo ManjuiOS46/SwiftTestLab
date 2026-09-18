@@ -230,6 +230,11 @@ private struct ResultCard: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    // A floor on width. Without it, SwiftUI's minimum-size pass
+                    // squeezes this text toward zero width, wraps it to one word per
+                    // line, and reports a minimum height of over a thousand points —
+                    // which the window then adopts as its size.
+                    .frame(minWidth: 220, alignment: .leading)
             }
             Spacer(minLength: 0)
         }

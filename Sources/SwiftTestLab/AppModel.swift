@@ -358,13 +358,42 @@ final class AppModel {
                 let package = try await inspector.inspect(folder: url)
                 workspace = .package(package)
                 resetRun()
-                if CommandLine.arguments.contains("--select-first") {
+                if CommandLine.arguments.contains("--select-first")
+                    || CommandLine.arguments.contains("--demo-run") {
                     selectedFile = package.sourceFiles.first
+                }
+                if CommandLine.arguments.contains("--demo-run") {
+                    loadDemoRun()
                 }
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    /// Puts the app into a finished-run state with realistic amounts of text, so
+    /// that layout can be measured without spending a model call. Developer aid.
+    func loadDemoRun() {
+        guard let subject else { return }
+        modelOutput = (try? subject.source()) ?? ""
+        buildLog = String(repeating: "note: building target Subject\n", count: 200)
+        generatedTest = GeneratedTest(
+            source: modelOutput,
+            suiteName: "DemoTests",
+            fileName: "DemoTests.swift"
+        )
+        report = VerificationReport(
+            outcome: .compileFailed,
+            buildLog: """
+            /tmp/Demo/Tests/DemoTests/DemoTests.swift:12:9: error: cannot find 'Widget' in scope
+            /tmp/Demo/Tests/DemoTests/DemoTests.swift:19:5: error: errors thrown from here are not handled
+            /tmp/Demo/Tests/DemoTests/DemoTests.swift:24:9: warning: unused variable 'result'
+            """,
+            testLog: "",
+            testFileName: "DemoTests.swift"
+        )
+        runError = nil
+        phase = .finished
     }
 
     func closeWorkspace() {

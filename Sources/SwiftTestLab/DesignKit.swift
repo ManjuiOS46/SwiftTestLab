@@ -165,6 +165,9 @@ struct Notice: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                        // See ResultCard: fixedSize text with no minimum width
+                        // reports an enormous minimum height.
+                        .frame(minWidth: 220, alignment: .leading)
                 }
             }
             Spacer(minLength: 8)

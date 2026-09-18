@@ -62,6 +62,32 @@ struct WindowBoundsLimiter: NSViewRepresentable {
         /// What the app opens at when nothing better is remembered.
         static let preferredSize = NSSize(width: 1_180, height: 760)
 
+        /// Developer aid: records any view laid out larger than the window holding
+        /// it. A scroll view's document is legitimately larger, so read the output
+        /// with that in mind.
+        static func dumpOversizedViews(in window: NSWindow) {
+            guard let root = window.contentView else { return }
+            let limit = window.frame.height
+            var lines = ["WINDOW \(Int(window.frame.width))x\(Int(window.frame.height))"]
+
+            func walk(_ view: NSView, depth: Int) {
+                if view.frame.height > limit + 1 || view.frame.width > window.frame.width + 1 {
+                    let indent = String(repeating: "  ", count: depth)
+                    lines.append("\(indent)OVERSIZED \(type(of: view)) "
+                                 + "\(Int(view.frame.width))x\(Int(view.frame.height))")
+                }
+                for subview in view.subviews { walk(subview, depth: depth + 1) }
+            }
+            walk(root, depth: 0)
+            let destination = FileManager.default.temporaryDirectory
+                .appending(path: "SwiftTestLab-layout.txt")
+            try? lines.joined(separator: "\n")
+                .write(to: destination, atomically: true, encoding: .utf8)
+            FileHandle.standardError.write(
+                Data("layout dump: \(destination.path(percentEncoded: false))\n".utf8)
+            )
+        }
+
         func attach(to window: NSWindow) {
             self.window = window
             window.minSize = NSSize(width: 820, height: 480)
@@ -72,6 +98,12 @@ struct WindowBoundsLimiter: NSViewRepresentable {
             // so the window opens filling the screen. `.defaultSize` doesn't win
             // that argument. Setting the frame once, only when there's nothing
             // saved to restore, does.
+            if CommandLine.arguments.contains("--dump-layout") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    MainActor.assumeIsolated { Coordinator.dumpOversizedViews(in: window) }
+                }
+            }
+
             guard !WindowStateRepair.hasUsableSavedFrame else { return }
             openAtPreferredSize(window)
         }

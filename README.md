@@ -254,6 +254,20 @@ In rough order of what I'd actually reach for:
 Each of those keeps the app small. The ones I'd still refuse are the sweep, the
 queue and the retry loop — those change what it is.
 
+## Developer flags
+
+The app takes a package path on the command line, which is how its layout was
+debugged without clicking through the UI by hand:
+
+```bash
+swift run SwiftTestLab /path/to/package --select-first
+swift run SwiftTestLab /path/to/package --demo-run    # a finished run, no model call
+swift run SwiftTestLab /path/to/package --dump-layout # records oversized views
+```
+
+They exist because a window that sizes itself from its content is very hard to
+reason about by eye, and measuring it beat guessing every time.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
