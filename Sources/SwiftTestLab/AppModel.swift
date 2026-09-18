@@ -405,11 +405,20 @@ final class AppModel {
             }
             try Task.checkCancellation()
 
-            let test = try extractor.extract(from: reply, subjectBaseName: request.subjectBaseName)
+            modelOutput = reply
+
+            // On disk before anything is allowed to reject it. A reply that can't be
+            // parsed is still kept, as text, rather than thrown away.
+            let test: GeneratedTest
+            do {
+                test = try extractor.extract(from: reply, subjectBaseName: request.subjectBaseName)
+            } catch {
+                savedURL = try? archive.saveUnusable(reply, for: subject, reason: .unparsed)
+                throw error
+            }
+
             generatedTest = test
             modelOutput = test.source
-
-            // Saved before anything can go wrong with the build.
             do {
                 savedURL = try archive.save(test, for: subject)
             } catch {
@@ -441,11 +450,13 @@ final class AppModel {
             phase = .finished
         } catch is CancellationError {
             buildLog += "\n— cancelled —\n"
-            runError = "Cancelled. Nothing was written, and the scratch copy is gone."
+            keepWhateverArrived(for: subject)
+            runError = "Cancelled. Anything already generated is saved; nothing was added to your test target."
             phase = .failed
         } catch {
             // Stays on screen next to whatever was generated, which is usually the
             // most useful thing to look at when something goes wrong.
+            keepWhateverArrived(for: subject)
             runError = error.localizedDescription
             phase = .failed
         }
@@ -453,6 +464,14 @@ final class AppModel {
         stage = nil
         if let sandbox { sandboxBuilder.destroy(sandbox) }
         runTask = nil
+    }
+
+    /// A run that stopped early still produced something. Keep it.
+    private func keepWhateverArrived(for subject: TestSubject) {
+        guard savedURL == nil else { return }
+        let text = modelOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        savedURL = try? archive.saveUnusable(modelOutput, for: subject, reason: .partial)
     }
 
     // MARK: - Accepting

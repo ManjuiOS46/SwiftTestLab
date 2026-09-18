@@ -21,8 +21,6 @@ struct ContentView: View {
         } detail: {
             DetailView()
         }
-        .frame(minWidth: 820, minHeight: 480)
-        .background(WindowConfigurator())
         // Opaque, so scrolled content can never appear behind the window controls.
         .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar { toolbarContent }

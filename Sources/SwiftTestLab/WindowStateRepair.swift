@@ -11,14 +11,15 @@ import SwiftTestLabKit
 
 /// Throws away restored window state that no longer fits on a screen.
 ///
-/// AppKit autosaves NSSplitView subview frames and restores them verbatim. If the
-/// window was ever laid out taller than the display — which it was, before the
-/// scroll views stopped reporting their whole contents as their ideal size — those
-/// heights come back into a correctly sized window, and the split view ends up
-/// taller than the window containing it. The panes then sit partly above and partly
-/// below the visible area, so neither end can be scrolled to.
+/// AppKit autosaves window and NSSplitView geometry and restores it verbatim. This
+/// app once sized its window from its content — a SwiftUI ScrollView reports its
+/// whole contents as its ideal size — and grew past the display. Those heights then
+/// came back into a correctly sized window, leaving the split view taller than the
+/// window containing it: both panes sat partly above and partly below the visible
+/// area, and neither end could be scrolled to.
 ///
-/// Run before any window is created.
+/// Runs once, before any window is created. Nothing clamps at layout time, because
+/// resizing a window from inside a layout pass just causes another layout pass.
 enum WindowStateRepair {
     static func discardStateLargerThanTheScreen(
         defaults: UserDefaults = .standard,
@@ -27,10 +28,17 @@ enum WindowStateRepair {
         let limit = screenHeight ?? Double(NSScreen.screens.map(\.frame.height).max() ?? 1_080)
 
         for (key, value) in defaults.dictionaryRepresentation() {
-            guard key.hasPrefix("NSSplitView Subview Frames"),
-                  let frames = value as? [String],
-                  WindowFrameMath.exceeds(limit, frames: frames) else { continue }
-            defaults.removeObject(forKey: key)
+            if key.hasPrefix("NSSplitView Subview Frames"),
+               let frames = value as? [String],
+               WindowFrameMath.exceeds(limit, frames: frames) {
+                defaults.removeObject(forKey: key)
+            }
+
+            if key.hasPrefix("NSWindow Frame"),
+               let frame = value as? String,
+               WindowFrameMath.windowIsTallerThanItsScreen(frame) {
+                defaults.removeObject(forKey: key)
+            }
         }
     }
 }
