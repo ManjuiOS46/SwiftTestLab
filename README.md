@@ -220,20 +220,61 @@ the line and the reason. It is a warning, not a block — you decide.
 
 ## Does it work?
 
-Measured, not assumed. Against `qwen3-coder:30b` running locally in Ollama, on a
-pricing type with a protocol dependency, two error cases and a clamped discount:
+Measured, not assumed. Six subjects, three runs each, against `qwen3-coder:30b`
+running locally in Ollama — 18 generations in all:
 
-- It reliably produces a test file with the right shape — a hand-written fake
-  implementing the protocol, happy path, both error paths, and the boundaries
-  (zero quantity, the 100% cap, a negative discount).
-- Roughly half the runs **pass**. Most of the rest **compile but fail**, almost
-  always because the model computed an expected total itself and got the arithmetic
-  wrong — precisely what rule 5 exists to prevent.
-- Before the framework-mechanics rules were added, most runs didn't compile at all.
+| | count | rate |
+|---|---|---|
+| Produced something parseable as a test | 18 | 100% |
+| Compiled | 14 | 78% |
+| Compiled **and passed** | 10 | 56% |
 
-That spread is the case for the app rather than against it. A generator without
-verification would have handed over the wrong-arithmetic version looking identical
-to the right one.
+Per subject:
+
+| Subject | Shape | Compiled | Passed |
+|---|---|---|---|
+| `Money` | value type, throwing operator | 3/3 | 3/3 |
+| `BoundedStack` | generic, stateful | 3/3 | 3/3 |
+| `VersionParser` | parsing, optionals | 2/3 | 2/3 |
+| `SlugMaker` | pure string functions | 3/3 | 1/3 |
+| `RetryPolicy` | protocol dependency | 3/3 | 1/3 |
+| `Announcer` | no observable behaviour | 0/3 | 0/3 |
+
+**The gap between the columns is the whole argument.** `SlugMaker` compiled every
+time and passed once: a test that builds tells you nothing about whether it is
+right. Most failures are the model computing an expected value itself and getting
+it wrong — precisely what rule 5 of the prompt exists to prevent, and it still
+happens, which is why the test is run rather than trusted.
+
+`Announcer` is the interesting one. It has no observable behaviour — everything it
+does goes to stdout — and nothing usable was produced for it in three runs. A
+generator without verification would have reported three successes.
+
+### Assertions that cannot fail
+
+The audit flagged none across those 18 runs. Re-running `Announcer` three more
+times, one produced exactly what the audit exists for:
+
+```swift
+#expect(throws: Never.self) { announcer.announce("Hello") }
+#expect(throws: Never.self) { announcer.warn("Something went wrong") }
+```
+
+`announce` is not declared `throws`. Neither assertion can fail. Both were caught.
+
+So it is real but intermittent — roughly one run in six on a subject with nothing
+to assert, and none at all on subjects that have something. Worth catching, not
+worth quoting a rate for.
+
+### What this is and isn't
+
+Six subjects, one model, three runs each, all small and self-contained. Enough to
+show the spread between *produced*, *compiled* and *passed* is real and wide.
+Not enough to predict what a larger model does on a large codebase.
+
+The six subjects are in `Benchmarks/Subjects/`. Open one in the app, generate
+three times, and compare. The counts will not match exactly — the model samples —
+but the spread between *compiled* and *passed* is stable.
 
 ---
 
