@@ -57,6 +57,8 @@ struct SectionHeader: View {
                 Text(trailing)
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
             }
         }
     }

@@ -44,6 +44,20 @@ struct CodeTextView: NSViewRepresentable {
         return scrollView
     }
 
+    /// Take exactly the space offered and no more.
+    ///
+    /// Without this, SwiftUI asks the scroll view for its fitting size, which is the
+    /// size of its *document* — the whole file. The pane then demands the width of
+    /// the longest line and the height of every line, and the window grows past the
+    /// screen to satisfy it. A scroll view should never influence its container.
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: NSScrollView,
+        context: Context
+    ) -> CGSize? {
+        CGSize(width: proposal.width ?? 480, height: proposal.height ?? 240)
+    }
+
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         guard textView.string != text else { return }
