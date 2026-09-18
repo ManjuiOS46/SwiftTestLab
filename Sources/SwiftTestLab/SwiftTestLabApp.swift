@@ -13,6 +13,10 @@ struct SwiftTestLabApp: App {
     @State private var model = AppModel()
 
     init() {
+        // Before any window exists: restored split-view geometry from an oversized
+        // window would otherwise be applied to a correctly sized one.
+        WindowStateRepair.discardStateLargerThanTheScreen()
+
         // Built as an SPM executable there is no app bundle, so the process has to
         // ask for a Dock icon and a menu bar itself. Harmless inside a bundle too.
         NSApplication.shared.setActivationPolicy(.regular)
