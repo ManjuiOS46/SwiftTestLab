@@ -22,8 +22,12 @@ public enum SystemPrompt {
         1. Return one complete, compilable test file and nothing else. No prose, \
         no explanation, no markdown fences — just Swift source, starting with its imports.
         2. Cover the happy path, boundary values and error paths.
-        3. Write fakes by implementing the protocol the subject depends on. Do not use a \
-        mocking framework; none is available.
+        3. Never refer to anything that isn't in the file you were given or the standard \
+        library. Do not invent a protocol, type, initialiser or property to make the \
+        subject testable. If it depends on a protocol, write a fake by implementing that \
+        protocol. If it depends on a concrete type or calls static methods, there is no \
+        seam — test what can be reached without one and leave the rest alone. No mocking \
+        framework is available.
         4. Never force-unwrap, never use `try!`, and never index a collection directly. \
         A trap takes down the whole suite, not one test. Use optional binding, \
         `first`/`last`, and the framework's own unwrapping and error assertions.

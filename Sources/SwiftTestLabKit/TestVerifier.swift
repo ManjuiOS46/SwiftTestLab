@@ -57,6 +57,20 @@ public struct VerificationReport: Sendable {
 
     public var errors: [Diagnostic] { diagnostics.filter { $0.severity == .error } }
 
+    /// True when the build failed but nothing was wrong with the generated file.
+    /// Usually means the package's own tests already don't compile, and every
+    /// verification against it will fail until they do.
+    public var failedElsewhere: Bool {
+        guard case .compileFailed = outcome, let testFileName else { return false }
+        let errors = self.errors
+        return !errors.isEmpty && !errors.contains { $0.file == testFileName }
+    }
+
+    /// The files, other than the generated one, that failed to compile.
+    public var otherFailingFiles: [String] {
+        Array(Set(errors.map(\.file).filter { $0 != testFileName })).sorted()
+    }
+
     public var compiled: Bool {
         switch outcome {
         case .passed, .testsFailed, .noTestsRan: true
@@ -70,6 +84,7 @@ public struct VerificationReport: Sendable {
     public var headline: String {
         switch outcome {
         case .passed: "Compiled and passed"
+        case .compileFailed where failedElsewhere: "Your package doesn't compile"
         case .compileFailed: "Did not compile"
         case .testsFailed: "Compiled, but tests failed"
         case .noTestsRan: "Compiled, but no tests ran"
@@ -81,6 +96,10 @@ public struct VerificationReport: Sendable {
         switch outcome {
         case .passed:
             "swift build --build-tests succeeded and every test in the suite passed."
+        case .compileFailed where failedElsewhere:
+            "The build failed, but not because of the generated test — the errors are in "
+            + otherFailingFiles.joined(separator: ", ")
+            + ". Until those compile, nothing can be verified against this package."
         case .compileFailed:
             "The generated test doesn't compile against this package. The compiler output is below."
         case .testsFailed:
