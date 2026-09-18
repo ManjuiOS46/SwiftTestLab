@@ -1,5 +1,7 @@
 # SwiftTestLab
 
+[![CI](https://github.com/ManjuiOS46/SwiftTestLab/actions/workflows/ci.yml/badge.svg)](https://github.com/ManjuiOS46/SwiftTestLab/actions/workflows/ci.yml)
+
 A small macOS app that generates a unit test for **one** Swift file, then compiles
 and runs it and shows you what happened. You decide whether to keep it.
 

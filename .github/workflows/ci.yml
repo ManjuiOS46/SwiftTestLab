@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # Pinned rather than macos-latest: the package needs Swift 6, and a runner
+    # image rolling forward under you is a confusing way to find that out.
+    runs-on: macos-15
+    # The integration tests build and run real Swift packages, so this job spawns
+    # compilers. Generous, but not unbounded.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report the toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build
+        run: swift build --build-tests
+
+      - name: Test
+        run: swift test
