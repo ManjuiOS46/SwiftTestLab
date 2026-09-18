@@ -9,6 +9,15 @@ The distinction it's built around: most test generators *produce* a test. This o
 **verifies** it. Nothing is reported as a success until `swift build --build-tests`
 and `swift test` have both actually run.
 
+It is not an agent, and that is the design rather than a shortfall. It takes one
+action, observes what happened, and stops. The loop is closed by you: you choose
+the file, you see the prompt before it is sent, and you decide whether the result
+is worth keeping. A tool that retries until something goes green optimises for
+green — and a test that passes while asserting nothing is the exact failure this
+app exists to catch.
+
+One turn, verified, with a human holding the decision.
+
 It works with Claude over the Anthropic API, or with an open model running on your
 own machine through Ollama, LM Studio, llama.cpp or vLLM — no key, no cost, nothing
 leaving the Mac.
@@ -93,9 +102,9 @@ logic behind the view is usually the better file to point at.
 
 These are choices, not gaps:
 
-- **No repair loop.** If the test fails, you get the output and the decision. An
-  agent that retries until something goes green optimises for green, not for a test
-  worth having.
+- **No repair loop.** If the test fails, you get the output and the decision.
+  This is the "not an agent" choice above, made concrete: the one place a tool
+  like this could act on its own is the one place it doesn't.
 - **No whole-project sweep, no planner, no work queue.** One file at a time. The
   value is in reading the result, and nobody reads two hundred generated tests.
 - **No coverage measurement.** Coverage tells you lines executed. Running the test
