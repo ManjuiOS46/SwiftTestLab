@@ -188,6 +188,12 @@ final class AppModel {
             .path(percentEncoded: false)
     }
 
+    /// Assertions in the generated test that are true by construction. A suite can
+    /// pass every one of these and still be worthless.
+    var vacuousAssertions: [VacuousAssertion] {
+        generatedTest?.vacuousAssertions ?? []
+    }
+
     func copyTestToClipboard() {
         guard let test = generatedTest else { return }
         NSPasteboard.general.clearContents()

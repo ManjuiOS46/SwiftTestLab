@@ -199,6 +199,25 @@ than a bad test — cheap to catch, but only if you actually compile it.
 
 ---
 
+## Assertions that cannot fail
+
+A suite can compile, run, pass every test, and assert nothing. Pointed at a type
+with no observable behaviour, `qwen3-coder:30b` produced this:
+
+```swift
+#expect(announcer.announce() == Void())            // comparing Void to Void
+#expect(throws: Never.self) { try announcer.run() } // a non-throwing call doesn't throw
+```
+
+Both pass. Neither is a test.
+
+Adding a rule to the system prompt forbidding exactly this **did not work** — the
+second example is what the model wrote *after* being told not to. Measured over
+three runs per condition on the same subject, there was no difference. So the app
+checks for it instead of asking: a passing run that contains assertions which are
+true by construction is reported as "Passed, but N assertions cannot fail", with
+the line and the reason. It is a warning, not a block — you decide.
+
 ## Does it work?
 
 Measured, not assumed. Against `qwen3-coder:30b` running locally in Ollama, on a

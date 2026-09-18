@@ -35,6 +35,17 @@ struct RunView: View {
                 }
                 if let report = model.report {
                     ResultCard(report: report)
+                    if !model.vacuousAssertions.isEmpty {
+                        Notice(
+                            symbol: "questionmark.diamond.fill",
+                            tint: .yellow,
+                            title: vacuousTitle,
+                            message: model.vacuousAssertions
+                                .prefix(4)
+                                .map { "line \($0.line): \($0.reason)" }
+                                .joined(separator: "\n")
+                        )
+                    }
                 } else if model.phase == .accepted, let url = model.acceptedURL {
                     Notice(
                         symbol: "checkmark.circle.fill",
@@ -88,6 +99,14 @@ struct RunView: View {
             default: break
             }
         }
+    }
+
+    private var vacuousTitle: String {
+        let count = model.vacuousAssertions.count
+        let passed = model.report?.passed == true
+        return passed
+            ? "Passed, but \(count) assertion\(count == 1 ? "" : "s") cannot fail"
+            : "\(count) assertion\(count == 1 ? "" : "s") cannot fail"
     }
 
     private var panes: [Pane] {
