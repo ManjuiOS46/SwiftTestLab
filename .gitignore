@@ -3,3 +3,6 @@
 SwiftTestLab.app/
 .DS_Store
 *.xcodeproj
+
+# Generated tests are kept here; delete the folder if you do not want them.
+# SwiftTestLabTests/

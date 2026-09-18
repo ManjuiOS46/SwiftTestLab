@@ -28,7 +28,12 @@ leaving the Mac.
    against the copy. Your files are not touched. Output streams live.
 6. **Decide.** Compiled or not, passed or not — with the compiler's actual
    complaints pulled out of the log, and the raw output a click away.
-7. **Accept.** Only on your click, and only after a diff, is anything written.
+7. **Saved either way.** Every generated test is written to `SwiftTestLabTests/`
+   beside the package (or beside the file) the moment it arrives, before the build
+   runs. Pass or fail, the file is on disk and the app shows you its path. Nothing
+   there is ever overwritten — a repeat generation becomes `-2`, `-3`.
+8. **Accept.** Only on your click, and only after a diff, does it go into your
+   actual test target.
 
 ---
 

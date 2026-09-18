@@ -102,7 +102,15 @@ final class AppModel {
 
     private(set) var workspace: Workspace?
     var fileFilter = ""
-    var selectedFile: SourceFile? { didSet { if selectedFile != oldValue { resetRun() } } }
+    var selectedFile: SourceFile? {
+        didSet {
+            // Only a real change of file resets the run. A List rebuilding its
+            // selection briefly sets this to nil, and treating that as a change
+            // threw away finished results in front of the user.
+            guard let selectedFile, selectedFile != oldValue else { return }
+            resetRun()
+        }
+    }
 
     var subject: TestSubject? {
         switch workspace {
@@ -141,6 +149,8 @@ final class AppModel {
     /// Where verification happened, kept for display: people reasonably want to
     /// know where the thing they just watched being built actually lives.
     private(set) var scratchPath: String?
+    /// Where the generated file was saved, always, as soon as it existed.
+    private(set) var savedURL: URL?
     /// Kept beside the output rather than thrown in an alert, so a failed run
     /// leaves everything it produced on screen instead of wiping it.
     private(set) var runError: String?
@@ -197,6 +207,7 @@ final class AppModel {
     @ObservationIgnored private let sandboxBuilder = SandboxBuilder()
     @ObservationIgnored private let verifier = TestVerifier()
     @ObservationIgnored private let writer = TestFileWriter()
+    @ObservationIgnored private let archive = GeneratedTestArchive()
     @ObservationIgnored private let diffRenderer = DiffRenderer()
     @ObservationIgnored private var runTask: Task<Void, Never>?
     @ObservationIgnored private var probeTask: Task<Void, Never>?
@@ -395,7 +406,15 @@ final class AppModel {
             try Task.checkCancellation()
 
             let test = try extractor.extract(from: reply, subjectBaseName: request.subjectBaseName)
+            generatedTest = test
             modelOutput = test.source
+
+            // Saved before anything can go wrong with the build.
+            do {
+                savedURL = try archive.save(test, for: subject)
+            } catch {
+                runError = "Generated the test but couldn't save it: \(error.localizedDescription)"
+            }
 
             // Checked before building, not after: verifying against a sandbox where
             // a human's test had been shadowed would be a meaningless green tick.
@@ -406,7 +425,6 @@ final class AppModel {
                 )
             }
 
-            generatedTest = test
             phase = .verifying
 
             let scratch = try sandboxBuilder.make(for: subject, generatedTest: test)
@@ -474,8 +492,13 @@ final class AppModel {
     }
 
     func revealAcceptedFile() {
-        guard let acceptedURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([acceptedURL])
+        guard let url = acceptedURL ?? savedURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func revealSavedFile() {
+        guard let savedURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([savedURL])
     }
 
     // MARK: - Reset
@@ -490,6 +513,8 @@ final class AppModel {
         pendingRequest = nil
         acceptedURL = nil
         runError = nil
+        savedURL = nil
+        scratchPath = nil
         phase = workspace == nil ? .start : .ready
     }
 }

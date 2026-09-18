@@ -49,3 +49,61 @@ import Testing
         #expect(writer.exists(at: destination))
     }
 }
+
+@Suite struct GeneratedTestArchiveTests {
+    private let test = GeneratedTest(
+        source: "import Testing\n",
+        suiteName: "SliderTests",
+        fileName: "SliderTests.swift"
+    )
+
+    @Test func savesBesideTheSubjectFile() throws {
+        let fixture = try Fixture()
+        try fixture.write("Slider.swift", "struct Slider {}")
+        let subject = TestSubject.standalone(
+            try StandaloneFile(url: fixture.root.appending(path: "Slider.swift"))
+        )
+
+        let url = try GeneratedTestArchive().save(test, for: subject)
+
+        #expect(url.deletingLastPathComponent().lastPathComponent == GeneratedTestArchive.folderName)
+        #expect(url.lastPathComponent == "SliderTests.swift")
+        #expect(try String(contentsOf: url, encoding: .utf8) == "import Testing\n")
+        withExtendedLifetime(fixture) {}
+    }
+
+    @Test func neverOverwritesAnEarlierGeneration() throws {
+        let fixture = try Fixture()
+        try fixture.write("Slider.swift", "struct Slider {}")
+        let subject = TestSubject.standalone(
+            try StandaloneFile(url: fixture.root.appending(path: "Slider.swift"))
+        )
+        let archive = GeneratedTestArchive()
+
+        let first = try archive.save(test, for: subject)
+        let second = try archive.save(test, for: subject)
+        let third = try archive.save(test, for: subject)
+
+        #expect(first.lastPathComponent == "SliderTests.swift")
+        #expect(second.lastPathComponent == "SliderTests-2.swift")
+        #expect(third.lastPathComponent == "SliderTests-3.swift")
+        withExtendedLifetime(fixture) {}
+    }
+
+    @Test func savesAtThePackageRootForAPackageSubject() async throws {
+        let fixture = try Fixture.widgetsPackage()
+        let package = try await PackageInspector().inspect(folder: fixture.root)
+        let subject = TestSubject.inPackage(
+            package: package,
+            file: try #require(package.sourceFiles.first)
+        )
+
+        let url = try GeneratedTestArchive().save(test, for: subject)
+
+        #expect(url.path(percentEncoded: false).hasPrefix(
+            fixture.root.appending(path: GeneratedTestArchive.folderName)
+                .path(percentEncoded: false)
+        ))
+        withExtendedLifetime(fixture) {}
+    }
+}

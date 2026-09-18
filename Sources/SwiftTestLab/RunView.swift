@@ -123,13 +123,10 @@ struct RunView: View {
     /// ask about a generated file.
     private var locationLine: String? {
         if let accepted = model.acceptedURL {
-            return "Written to \(accepted.path(percentEncoded: false))"
+            return "In your test target: \(accepted.path(percentEncoded: false))"
         }
-        if model.generatedTest != nil {
-            if let destination = model.destinationPath {
-                return "Not written yet · Accept would write it to \(destination)"
-            }
-            return "Not written yet · Accept asks you where to save it"
+        if let saved = model.savedURL {
+            return "Saved to \(saved.path(percentEncoded: false))"
         }
         if let scratch = model.scratchPath {
             return "Building in \(scratch)"
@@ -180,7 +177,9 @@ struct RunView: View {
                     .buttonStyle(.borderedProminent)
                 Button("Copy Test") { model.copyTestToClipboard() }
                     .disabled(model.generatedTest == nil)
-                Text("What was generated is still above — nothing was written to your files.")
+                Button("Show File") { model.revealSavedFile() }
+                    .disabled(model.savedURL == nil)
+                Text("The generated file is saved — nothing was added to your test target.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -200,6 +199,8 @@ struct RunView: View {
                 }
                 Button("Copy Test") { model.copyTestToClipboard() }
                     .disabled(model.generatedTest == nil)
+                Button("Show File") { model.revealSavedFile() }
+                    .disabled(model.savedURL == nil)
                 Button("Start Over") { model.resetRun() }
                 if !model.canAccept {
                     Text("A test that doesn't compile is never written.")

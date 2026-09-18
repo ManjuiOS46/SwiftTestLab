@@ -137,53 +137,6 @@ struct StageTrack: View {
     }
 }
 
-// MARK: - Code
-
-/// A read-only monospaced pane. Used for source, prompts and build logs.
-struct CodePane: View {
-    let text: String
-    var followsTail = false
-    var placeholder = ""
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView([.vertical, .horizontal]) {
-                VStack(alignment: .leading, spacing: 0) {
-                    if text.isEmpty {
-                        Text(placeholder)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
-                            .padding(14)
-                    } else {
-                        Text(text)
-                            .font(.system(size: 11.5, design: .monospaced))
-                            .textSelection(.enabled)
-                            .lineSpacing(2)
-                            .padding(14)
-                    }
-                    Color.clear.frame(height: 1).id("tail")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .onChange(of: text) {
-                guard followsTail else { return }
-                withAnimation(.linear(duration: 0.1)) {
-                    proxy.scrollTo("tail", anchor: .bottom)
-                }
-            }
-        }
-        // Without an ideal height the scroll view reports its entire content as its
-        // preferred size, and the window grows to match it.
-        .frame(minHeight: 180, idealHeight: 280, maxHeight: .infinity)
-        .background(Color.editor)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(Color.hairline, lineWidth: 1)
-        )
-    }
-}
-
 // MARK: - Notices
 
 struct Notice: View {
