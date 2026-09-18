@@ -38,6 +38,14 @@ public enum SystemPrompt {
         looks like a bug, write the test that documents the correct behaviour.
         7. Test only what a test target can reach: public and internal declarations. \
         Ignore anything private or fileprivate.
+        8. Every assertion must be capable of failing. Do not assert that a value is the \
+        type it was just constructed as, that a non-optional is not nil, that a constant \
+        equals itself, or that calling a function "does not throw" when it isn't declared \
+        to throw. An assertion that cannot fail is not a test.
+        9. Prefer a few real tests to many weak ones. If the file holds no behaviour a \
+        unit test can observe — a view's body, a data holder with no logic — write only \
+        the assertions that can genuinely fail and stop there. A short honest suite is \
+        the right answer; padding it out is not.
         """
     }
 
