@@ -98,32 +98,6 @@ logic behind the view is usually the better file to point at.
 
 ---
 
-## What it deliberately doesn't do
-
-These are choices, not gaps:
-
-- **No repair loop.** If the test fails, you get the output and the decision.
-  This is the "not an agent" choice above, made concrete: the one place a tool
-  like this could act on its own is the one place it doesn't.
-- **No whole-project sweep, no planner, no work queue.** One file at a time. The
-  value is in reading the result, and nobody reads two hundred generated tests.
-- **No coverage measurement.** Coverage tells you lines executed. Running the test
-  tells you it compiles, runs and asserts — a stronger claim, measured directly.
-- **No Xcode projects, simulators or code signing.** SwiftPM only, so verification
-  is one command with no scheme or device in the way.
-- **It will not create a test target.** If a package has none, it says so up front
-  instead of failing obscurely at build time.
-- **It will never overwrite an existing test file** in package mode. The write uses
-  `O_EXCL`, so the guarantee holds even against a race, and the run stops before the
-  build — verifying against a sandbox where a human's test had been shadowed would
-  be a meaningless green tick. (In single-file mode you name the path yourself in a
-  save panel, so that panel's replace confirmation is the decision.)
-- **A test that doesn't compile is never written**, however you feel about it. One
-  that compiles but fails, you may accept — that's a judgement call, and the app
-  says so rather than deciding for you.
-
----
-
 ## Requirements
 
 - macOS 14 or later
@@ -286,6 +260,32 @@ Not enough to predict what a larger model does on a large codebase.
 The six subjects are in `Benchmarks/Subjects/`. Open one in the app, generate
 three times, and compare. The counts will not match exactly — the model samples —
 but the spread between *compiled* and *passed* is stable.
+
+---
+
+## What it deliberately doesn't do
+
+These are choices, not gaps:
+
+- **No repair loop.** If the test fails, you get the output and the decision.
+  This is the "not an agent" choice above, made concrete: the one place a tool
+  like this could act on its own is the one place it doesn't.
+- **No whole-project sweep, no planner, no work queue.** One file at a time. The
+  value is in reading the result, and nobody reads two hundred generated tests.
+- **No coverage measurement.** Coverage tells you lines executed. Running the test
+  tells you it compiles, runs and asserts — a stronger claim, measured directly.
+- **No Xcode projects, simulators or code signing.** SwiftPM only, so verification
+  is one command with no scheme or device in the way.
+- **It will not create a test target.** If a package has none, it says so up front
+  instead of failing obscurely at build time.
+- **It will never overwrite an existing test file** in package mode. The write uses
+  `O_EXCL`, so the guarantee holds even against a race, and the run stops before the
+  build — verifying against a sandbox where a human's test had been shadowed would
+  be a meaningless green tick. (In single-file mode you name the path yourself in a
+  save panel, so that panel's replace confirmation is the decision.)
+- **A test that doesn't compile is never written**, however you feel about it. One
+  that compiles but fails, you may accept — that's a judgement call, and the app
+  says so rather than deciding for you.
 
 ---
 
