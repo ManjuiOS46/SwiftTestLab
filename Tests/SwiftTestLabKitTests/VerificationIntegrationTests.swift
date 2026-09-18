@@ -99,7 +99,7 @@ import Testing
         let test = try TestCodeExtractor().extract(
             from: """
             import Testing
-            @testable import Subject
+            @testable import \(subject.moduleName)
 
             @Suite struct TemperatureTests {
                 @Test func freezingConverts() {

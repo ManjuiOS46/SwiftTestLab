@@ -66,13 +66,44 @@ public struct StandaloneFile: Sendable, Identifiable, Hashable {
     /// `.../Sources/PixiiCloneApp/Models.swift` is module `PixiiCloneApp`, by the
     /// convention SwiftPM itself uses.
     public var moduleName: String {
+        // A Swift package: Sources/<Module>/File.swift, SwiftPM's own convention.
         let components = url.pathComponents
         if let sources = components.lastIndex(of: "Sources"),
-           components.index(after: sources) < components.count - 1 {
-            let candidate = components[components.index(after: sources)]
-            if let identifier = Self.asSwiftIdentifier(candidate) { return identifier }
+           components.index(after: sources) < components.count - 1,
+           let identifier = Self.asSwiftIdentifier(components[components.index(after: sources)]) {
+            return identifier
         }
+
+        // An Xcode project: the module is the target, which for the common
+        // single-target app is the project's own name.
+        if let project = Self.enclosingXcodeProjectName(of: directory),
+           let identifier = Self.asSwiftIdentifier(project) {
+            return identifier
+        }
+
+        // Otherwise the folder the file sits in is the best guess available.
+        if let identifier = Self.asSwiftIdentifier(directory.lastPathComponent) {
+            return identifier
+        }
+
         return Self.fallbackModuleName
+    }
+
+    /// Walks up looking for an `.xcodeproj`, returning its name without the suffix.
+    static func enclosingXcodeProjectName(of directory: URL) -> String? {
+        var current = directory.standardizedFileURL
+        for _ in 0..<8 {
+            let entries = (try? FileManager.default.contentsOfDirectory(
+                atPath: current.path(percentEncoded: false)
+            )) ?? []
+            if let project = entries.first(where: { $0.hasSuffix(".xcodeproj") }) {
+                return String(project.dropLast(".xcodeproj".count))
+            }
+            let parent = current.deletingLastPathComponent().standardizedFileURL
+            guard parent.path(percentEncoded: false) != current.path(percentEncoded: false) else { break }
+            current = parent
+        }
+        return nil
     }
 
     public var testTargetName: String { "\(moduleName)Tests" }

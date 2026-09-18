@@ -33,7 +33,7 @@ import Testing
         )
         let test = try TestCodeExtractor().extract(from: """
         import Testing
-        @testable import Subject
+        @testable import \(subject.moduleName)
 
         @Suite struct BadgeTests {
             @Test func capsAtNinetyNinePlus() { #expect(Badge(count: 150).label == "99+") }
@@ -73,7 +73,7 @@ import Testing
 
         let test = try TestCodeExtractor().extract(from: """
         import Testing
-        @testable import Subject
+        @testable import \(subject.moduleName)
 
         @Suite struct ScreenTests {
             @Test func builds() { _ = Screen() }

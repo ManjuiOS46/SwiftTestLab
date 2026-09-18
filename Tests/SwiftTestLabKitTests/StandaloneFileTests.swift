@@ -39,26 +39,28 @@ import Testing
 
     @Test func aStandaloneSubjectHasNowhereToWriteWithoutAsking() throws {
         let fixture = try Fixture()
-        try fixture.write("Slider.swift", "struct Slider {}")
+        try fixture.write("Sources/Widgets/Slider.swift", "struct Slider {}")
         let subject = TestSubject.standalone(
-            try StandaloneFile(url: fixture.root.appending(path: "Slider.swift"))
+            try StandaloneFile(url: fixture.root.appending(path: "Sources/Widgets/Slider.swift"))
         )
 
         #expect(subject.destination(forTestFileNamed: "SliderTests.swift") == nil)
-        #expect(subject.moduleName == StandaloneFile.fallbackModuleName)
+        #expect(subject.moduleName == "Widgets")
         #expect(subject.framework == .swiftTesting)
+        withExtendedLifetime(fixture) {}
     }
 
     @Test func theStandalonePromptTellsTheModelItIsOnItsOwn() throws {
         let fixture = try Fixture()
-        try fixture.write("Slider.swift", "struct Slider {}")
+        try fixture.write("Sources/Widgets/Slider.swift", "struct Slider {}")
         let subject = TestSubject.standalone(
-            try StandaloneFile(url: fixture.root.appending(path: "Slider.swift"))
+            try StandaloneFile(url: fixture.root.appending(path: "Sources/Widgets/Slider.swift"))
         )
 
         let message = PromptBuilder.userMessage(for: subject, source: "struct Slider {}")
-        #expect(message.contains("@testable import \(StandaloneFile.fallbackModuleName)"))
+        #expect(message.contains("@testable import Widgets"))
         #expect(message.contains("no access to the rest of the project"))
+        withExtendedLifetime(fixture) {}
     }
 }
 
@@ -90,12 +92,40 @@ import Testing
         withExtendedLifetime(fixture) {}
     }
 
-    @Test func fallsBackWhenThereIsNoSourcesDirectoryToLearnFrom() throws {
+    /// An Xcode project has no Sources directory; its module is the target, which
+    /// for the common single-target app is the project's own name.
+    @Test func takesTheModuleNameFromAnXcodeProject() throws {
         let fixture = try Fixture()
-        try fixture.write("Models.swift", "struct Brand {}")
-        let file = try StandaloneFile(url: fixture.root.appending(path: "Models.swift"))
+        try fixture.makeDirectory("LoginApp/LoginApp.xcodeproj")
+        try fixture.write("LoginApp/LoginApp/HomeView.swift", "struct HomeView {}")
+        let file = try StandaloneFile(
+            url: fixture.root.appending(path: "LoginApp/LoginApp/HomeView.swift")
+        )
 
-        #expect(file.moduleName == StandaloneFile.fallbackModuleName)
+        #expect(file.moduleName == "LoginApp")
+        withExtendedLifetime(fixture) {}
+    }
+
+    @Test func fallsBackToTheEnclosingFolderWhenThereIsNothingElse() throws {
+        let fixture = try Fixture()
+        try fixture.write("Helpers/Formatting.swift", "struct Formatting {}")
+        let file = try StandaloneFile(
+            url: fixture.root.appending(path: "Helpers/Formatting.swift")
+        )
+
+        #expect(file.moduleName == "Helpers")
+        withExtendedLifetime(fixture) {}
+    }
+
+    @Test func aPackageLayoutStillWinsOverAnXcodeProjectAlongside() throws {
+        let fixture = try Fixture()
+        try fixture.makeDirectory("Demo.xcodeproj")
+        try fixture.write("Sources/Engine/Widget.swift", "struct Widget {}")
+        let file = try StandaloneFile(
+            url: fixture.root.appending(path: "Sources/Engine/Widget.swift")
+        )
+
+        #expect(file.moduleName == "Engine")
         withExtendedLifetime(fixture) {}
     }
 
