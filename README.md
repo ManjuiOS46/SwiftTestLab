@@ -101,7 +101,10 @@ logic behind the view is usually the better file to point at.
 ## Requirements
 
 - macOS 14 or later
-- Swift 6 toolchain (Xcode 16+ or the Command Line Tools)
+- Swift 6.2 or later (Xcode 26+). Not 6.0 or 6.1: the app uses `nonisolated
+  deinit`, which was experimental before 6.2, and an older toolchain fails with
+  an error that doesn't mention the version. The manifest declares 6.2 so
+  SwiftPM says so plainly instead.
 - An Anthropic API key, **or** a local model server — either is enough
 - No third-party dependencies. `URLSession` and `Process`, nothing else.
 
