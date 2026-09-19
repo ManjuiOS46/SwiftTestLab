@@ -286,9 +286,10 @@ These are choices, not gaps:
   build — verifying against a sandbox where a human's test had been shadowed would
   be a meaningless green tick. (In single-file mode you name the path yourself in a
   save panel, so that panel's replace confirmation is the decision.)
-- **A test that doesn't compile is never written**, however you feel about it. One
-  that compiles but fails, you may accept — that's a judgement call, and the app
-  says so rather than deciding for you.
+- **A test that doesn't compile never reaches your test target**, however you feel
+  about it. It is still saved to `SwiftTestLabTests/` so you can read it — those
+  are two different places, and the app says which. One that compiles but fails,
+  you may accept: that's a judgement call, and it leaves it to you.
 
 ---
 

@@ -222,7 +222,10 @@ struct RunView: View {
                     .disabled(model.savedURL == nil)
                 Button("Start Over") { model.resetRun() }
                 if !model.canAccept {
-                    Text("A test that doesn't compile is never written.")
+                    // "Saved to …" sits directly above this, so the unqualified
+                    // version read as a contradiction: the file is on disk in the
+                    // archive, and it is the test target it never reaches.
+                    Text("A test that doesn't compile is never written into your test target.")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
