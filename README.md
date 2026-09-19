@@ -18,6 +18,9 @@ app exists to catch.
 
 One turn, verified, with a human holding the decision.
 
+![A generated test that compiled and passed, with Review & Accept ready](docs/screenshots/run-passed.png)
+
+
 It works with Claude over the Anthropic API, or with an open model running on your
 own machine through Ollama, LM Studio, llama.cpp or vLLM — no key, no cost, nothing
 leaving the Mac.
@@ -46,6 +49,8 @@ leaving the Mac.
 8. **Accept.** Only on your click, and only after a diff, does it go into your
    actual test target.
 
+![A file picked, with the prompt not yet sent](docs/screenshots/source-loaded.png)
+
 ---
 
 ## Models: hosted, or on your own machine
@@ -71,6 +76,8 @@ scratchpad is stripped, not written into your test file.
 ---
 
 ## The two ways in
+
+![The two entry points: a Swift package, or a single file](docs/screenshots/start-screen.png)
 
 **Package mode** is the fuller one. It reads your manifest, finds your test target,
 detects whether your existing tests use Swift Testing or XCTest and instructs the
@@ -165,6 +172,10 @@ is still one click away.
 
 ## The system prompt
 
+Every request is shown in full before it leaves the machine — the system prompt, the message, the character count, and the endpoint it is going to:
+
+![The prompt preview, showing exactly what will be sent](docs/screenshots/prompt-preview.png)
+
 Built in [`SystemPrompt.swift`](Sources/SwiftTestLabKit/SystemPrompt.swift), and
 shown to you in full before every run. It adapts to the framework the package
 already uses — the sidebar shows which was detected and why. The rules:
@@ -208,35 +219,47 @@ the line and the reason. It is a warning, not a block — you decide.
 
 ## Does it work?
 
-Measured, not assumed. Six subjects, three runs each, against `qwen3-coder:30b`
-running locally in Ollama — 18 generations in all:
+Measured, not assumed. Six subjects against `qwen3-coder:30b` running locally in
+Ollama, five runs each, swept twice — 60 generations in all:
 
 | | count | rate |
 |---|---|---|
-| Produced something parseable as a test | 18 | 100% |
-| Compiled | 14 | 78% |
-| Compiled **and passed** | 10 | 56% |
+| Produced something parseable as a test | 60 | 100% |
+| Compiled | 37 | 62% |
+| Compiled **and passed** | 25 | 42% |
 
-Per subject:
+The two sweeps were run independently and landed within three points of each
+other — 43% and 40% passed — so the aggregate is steady. An earlier version of
+this table reported 78% and 56% from 18 generations. That was optimistic, and
+these numbers replace it.
 
-| Subject | Shape | Compiled | Passed |
-|---|---|---|---|
-| `Money` | value type, throwing operator | 3/3 | 3/3 |
-| `BoundedStack` | generic, stateful | 3/3 | 3/3 |
-| `VersionParser` | parsing, optionals | 2/3 | 2/3 |
-| `SlugMaker` | pure string functions | 3/3 | 1/3 |
-| `RetryPolicy` | protocol dependency | 3/3 | 1/3 |
-| `Announcer` | no observable behaviour | 0/3 | 0/3 |
+**The gap between the rows is the whole argument.** A fifth of all generations
+compiled and then failed their own assertions. A test that builds tells you
+nothing about whether it is right, and a tool that stopped at "compiled" would
+have counted every one of those as a success. Most of those failures are the
+model computing an expected value itself and getting it wrong — precisely what
+rule 5 of the prompt exists to prevent, and it still happens, which is why the
+test is run rather than trusted.
 
-**The gap between the columns is the whole argument.** `SlugMaker` compiled every
-time and passed once: a test that builds tells you nothing about whether it is
-right. Most failures are the model computing an expected value itself and getting
-it wrong — precisely what rule 5 of the prompt exists to prevent, and it still
-happens, which is why the test is run rather than trusted.
+### Per subject, the rates don't hold still
 
-`Announcer` is the interesting one. It has no observable behaviour — everything it
-does goes to stdout — and nothing usable was produced for it in three runs. A
-generator without verification would have reported three successes.
+Quoting a rate per subject turned out to be a mistake. Across two identical
+sweeps of five runs each, `BoundedStack` went 1/5 then 3/5, and `SlugMaker` went
+4/5 then 2/5. The model samples; at this n a single subject's rate is mostly
+noise. An earlier table here put `Money` at 3/3 and `VersionParser` at 2/3 — over
+ten runs they are 2/10 and 10/10, close to inverted.
+
+Two subjects are stable, and they are the two that bound the range:
+
+| Subject | Shape | Passed |
+|---|---|---|
+| `VersionParser` | parsing, optionals, a clean seam | 10/10 |
+| `Announcer` | no observable behaviour | 0/10 |
+
+`Announcer` is the one worth dwelling on. Everything it does goes to stdout, so
+there is nothing a unit test can observe, and across ten runs nothing usable was
+ever produced for it. A generator without verification would have reported ten
+successes.
 
 ### Assertions that cannot fail
 
@@ -256,13 +279,15 @@ worth quoting a rate for.
 
 ### What this is and isn't
 
-Six subjects, one model, three runs each, all small and self-contained. Enough to
-show the spread between *produced*, *compiled* and *passed* is real and wide.
-Not enough to predict what a larger model does on a large codebase.
+Six subjects, one model, sixty generations, all small and self-contained. Enough
+to show the spread between *produced*, *compiled* and *passed* is real and wide,
+and enough for the aggregate to hold across independent sweeps. Not enough to
+predict what a larger model does on a large codebase — and, as above, not enough
+to quote a rate for any single subject.
 
-The six subjects are in `Benchmarks/Subjects/`. Open one in the app, generate
-three times, and compare. The counts will not match exactly — the model samples —
-but the spread between *compiled* and *passed* is stable.
+The six subjects are in `Benchmarks/Subjects/`. Open one in the app and generate
+a few times. Your counts will not match — the model samples — but the spread
+between *compiled* and *passed* will.
 
 ---
 
@@ -332,7 +357,10 @@ were found by running it. Adding both costs around 7KB of prompt for no measured
 gain, so it isn't shipped.
 
 Small sample, one model, one subject — enough to decline, not enough to conclude a
-stronger model wouldn't benefit.
+stronger model wouldn't benefit. Three runs is below the point where a rate means
+much, as the sweeps above show; what carries the decision here is that the
+vendored reference was no better than the section it would replace, and cost 7KB
+to find out.
 
 ## What I'd add next
 
