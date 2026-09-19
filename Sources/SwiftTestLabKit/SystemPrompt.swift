@@ -71,9 +71,15 @@ public enum SystemPrompt {
             - A fake that records calls or varies its answers must be a `final class`, not a \
             struct: a test holds it in a `let`, and a `let` struct cannot be mutated.
 
-            The single most common way this goes wrong: a `@Test` function whose body \
-            contains `try` anywhere must itself be declared `throws`. Check every test \
-            function for this before you answer.
+            Three things break these tests more often than anything else. Check the file \
+            you are about to answer with against all three:
+            - A `@Test` function whose body contains `try` anywhere must itself be \
+            declared `throws`.
+            - If the type under test carries a global actor such as `@MainActor`, the \
+            `@Suite` type needs that same annotation. A nonisolated test cannot construct \
+            an isolated type, or even read one of its properties.
+            - A `private(set)` property cannot be assigned from a test, however ordinary \
+            the assignment looks. Read it, and change it by calling the code that sets it.
 
             The shape to follow — a whole file, imports included:
 
@@ -111,6 +117,14 @@ public enum SystemPrompt {
             - Use `XCTAssertThrowsError` for error paths, checking the error in its closure.
             - A fake that records calls or varies its answers must be a `final class`, not a \
             struct: a test holds it in a `let`, and a `let` struct cannot be mutated.
+
+            Two more that break these tests often. Check the file you are about to answer \
+            with against both:
+            - If the type under test carries a global actor such as `@MainActor`, the \
+            `XCTestCase` subclass needs that same annotation. A nonisolated test cannot \
+            construct an isolated type, or even read one of its properties.
+            - A `private(set)` property cannot be assigned from a test, however ordinary \
+            the assignment looks. Read it, and change it by calling the code that sets it.
 
             Do not use Swift Testing macros.
             """
