@@ -8,23 +8,49 @@ on:
 
 jobs:
   test:
-    # Pinned rather than macos-latest: the package needs Swift 6, and a runner
-    # image rolling forward under you is a confusing way to find that out.
     runs-on: macos-15
     # The integration tests build and run real Swift packages, so this job spawns
     # compilers. Generous, but not unbounded.
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Report the toolchain
+      # The image ships several Xcodes and defaults to an older one. This package
+      # builds on Swift 6.2 and above; on 6.0 the concurrency rules it relies on
+      # were stricter, so take the newest toolchain the runner actually has.
+      - name: Use the newest Xcode on the image
         run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer"
           swift --version
           xcodebuild -version
 
+      # Output goes to the job summary as well as the log, because a log needs a
+      # signed-in reader and a summary does not — which matters when the person
+      # diagnosing a red badge is not the person who owns the repository.
       - name: Build
-        run: swift build --build-tests
+        run: |
+          set -o pipefail
+          swift build --build-tests 2>&1 | tee build.log || {
+            {
+              echo '### Build failed'
+              echo '```'
+              tail -40 build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
 
       - name: Test
-        run: swift test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test.log || {
+            {
+              echo '### Tests failed'
+              echo '```'
+              tail -40 test.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
