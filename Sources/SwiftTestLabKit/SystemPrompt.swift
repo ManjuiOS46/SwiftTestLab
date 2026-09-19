@@ -22,8 +22,9 @@ public enum SystemPrompt {
         1. Return one complete, compilable test file and nothing else. No prose, \
         no explanation, no markdown fences — just Swift source, starting with its imports.
         2. Cover the happy path, boundary values and error paths.
-        3. Never refer to anything that isn't in the file you were given or the standard \
-        library. Do not invent a protocol, type, initialiser or property to make the \
+        3. Never refer to anything that isn't in the file you were given, a module named \
+        in the request, or the standard library. Do not invent a protocol, type, \
+        initialiser or property to make the \
         subject testable. If it depends on a protocol, write a fake by implementing that \
         protocol. If it depends on a concrete type or calls static methods, there is no \
         seam — test what can be reached without one and leave the rest alone. No mocking \
@@ -37,7 +38,10 @@ public enum SystemPrompt {
         6. Assert the behaviour the code should have, not what it happens to do. If a line \
         looks like a bug, write the test that documents the correct behaviour.
         7. Test only what a test target can reach: public and internal declarations. \
-        Ignore anything private or fileprivate.
+        A private or fileprivate member cannot be called at all — reach it through the \
+        internal API that uses it, or leave it alone. A `private(set)` property can be \
+        read but not assigned: check its value, and change it by calling the code that \
+        sets it.
         8. Every assertion must be capable of failing. Do not assert that a value is the \
         type it was just constructed as, that a non-optional is not nil, that a constant \
         equals itself, or that calling a function "does not throw" when it isn't declared \
@@ -172,19 +176,7 @@ public struct PromptBuilder: Sendable {
     static func userMessage(for subject: TestSubject, source: String) -> String {
         switch subject {
         case .inPackage(let package, let file):
-            """
-            Package: \(package.name)
-            Module under test: \(file.moduleName)
-            File: \(file.relativePath)
-            Test target: \(package.testTarget.name) (\(package.testTarget.framework.displayName))
-
-            The test file will live in \(package.testTarget.relativeDirectory)/ and must \
-            `@testable import \(file.moduleName)`.
-
-            Write the test file for this source:
-
-            \(source)
-            """
+            packageMessage(package: package, file: file, source: source)
         case .standalone(let file):
             """
             File: \(file.fileName)
@@ -200,5 +192,108 @@ public struct PromptBuilder: Sendable {
             \(source)
             """
         }
+    }
+
+    /// The package case, which needs more than one paragraph: a file rarely sits
+    /// alone in its module, and what it reaches for changes what the test must say
+    /// before it will compile.
+    private static func packageMessage(package: SwiftPackage, file: SourceFile, source: String) -> String {
+        var notes: [String] = []
+
+        let siblings = siblingModules(importedBy: source, in: package, own: file.moduleName)
+        if !siblings.isEmpty {
+            notes.append("""
+                \(file.moduleName) isn't the only module in play: this file also imports \
+                \(list(siblings)) from the same package. Types it uses from them are not \
+                visible through `@testable import \(file.moduleName)` on its own, so import \
+                them in the test file as well.
+                """)
+        }
+
+        let outside = outsideModules(importedBy: source, in: package, own: file.moduleName)
+        if !outside.isEmpty {
+            notes.append("""
+                It also imports \(list(outside)) from outside the package. Import those in the \
+                test only where the test itself names something from them.
+                """)
+        }
+
+        if let actor = globalActor(in: source) {
+            notes.append("""
+                This file's declarations are `@\(actor)`-isolated. A test that constructs or \
+                touches them has to be isolated the same way, so mark the test type \
+                `@\(actor)`. A nonisolated test calling into it will not compile.
+                """)
+        }
+
+        let preamble = notes.isEmpty ? "" : "\n\n" + notes.joined(separator: "\n\n")
+
+        return """
+            Package: \(package.name)
+            Module under test: \(file.moduleName)
+            File: \(file.relativePath)
+            Test target: \(package.testTarget.name) (\(package.testTarget.framework.displayName))
+
+            The test file will live in \(package.testTarget.relativeDirectory)/ and must \
+            `@testable import \(file.moduleName)`.\(preamble)
+
+            Write the test file for this source:
+
+            \(source)
+            """
+    }
+
+    /// Modules the file imports that belong to the same package.
+    ///
+    /// An app module that reaches into a kit module produces a test that can't see
+    /// the kit's types until the test imports the kit too.
+    static func siblingModules(
+        importedBy source: String,
+        in package: SwiftPackage,
+        own moduleName: String
+    ) -> [String] {
+        let siblings = Set(package.sourceFiles.map(\.moduleName)).subtracting([moduleName])
+        return importedModules(in: source).filter(siblings.contains)
+    }
+
+    /// Everything else the file imports — AppKit, SwiftUI, a package it depends on.
+    /// Foundation is left out; it carries no information.
+    static func outsideModules(
+        importedBy source: String,
+        in package: SwiftPackage,
+        own moduleName: String
+    ) -> [String] {
+        let inPackage = Set(package.sourceFiles.map(\.moduleName)).union([moduleName])
+        return importedModules(in: source).filter { !inPackage.contains($0) && $0 != "Foundation" }
+    }
+
+    /// Module names from the file's own import lines, in the order they appear.
+    ///
+    /// Takes the module rather than the member from `import struct Foundation.Data`,
+    /// and allows an attribute in front, as in `@preconcurrency import AppKit`.
+    static func importedModules(in source: String) -> [String] {
+        let pattern = /^[ \t]*(?:@\w+[ \t]+)?import[ \t]+(?:(?:struct|class|enum|protocol|typealias|func|var|let)[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)/
+            .anchorsMatchLineEndings()
+        var seen: Set<String> = []
+        return source.matches(of: pattern)
+            .map { String($0.1) }
+            .filter { seen.insert($0).inserted }
+    }
+
+    /// The global actor the file's own top-level declarations carry, if any.
+    ///
+    /// Matched at column zero, so this is the file's isolation rather than an
+    /// attribute on some nested member.
+    static func globalActor(in source: String) -> String? {
+        let pattern = /^@(MainActor|[A-Z][A-Za-z0-9_]*Actor)\b/.anchorsMatchLineEndings()
+        return source.firstMatch(of: pattern).map { String($0.1) }
+    }
+
+    /// `["A", "B", "C"]` -> "`A`, `B` and `C`"
+    static func list(_ names: [String]) -> String {
+        let quoted = names.map { "`\($0)`" }
+        guard let last = quoted.last else { return "" }
+        guard quoted.count > 1 else { return last }
+        return quoted.dropLast().joined(separator: ", ") + " and " + last
     }
 }
