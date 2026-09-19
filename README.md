@@ -234,7 +234,13 @@ this table reported 78% and 56% from 18 generations. That was optimistic, and
 these numbers replace it.
 
 **The gap between the rows is the whole argument.** A fifth of all generations
-compiled and then failed their own assertions. A test that builds tells you
+compiled and then failed their own assertions.
+
+![A test that compiled and then failed its own assertions](docs/screenshots/run-tests-failed.png)
+
+The run above is the case in one picture: the model invented an exponential
+backoff schedule, asserted it, and the file built without complaint. Anything
+that stopped at *compiled* would have called that a success. A test that builds tells you
 nothing about whether it is right, and a tool that stopped at "compiled" would
 have counted every one of those as a success. Most of those failures are the
 model computing an expected value itself and getting it wrong — precisely what
@@ -298,6 +304,8 @@ These are choices, not gaps:
 - **No repair loop.** If the test fails, you get the output and the decision.
   This is the "not an agent" choice above, made concrete: the one place a tool
   like this could act on its own is the one place it doesn't.
+
+  ![A test that did not compile, with Accept disabled](docs/screenshots/run-compile-failed.png)
 - **No whole-project sweep, no planner, no work queue.** One file at a time. The
   value is in reading the result, and nobody reads two hundred generated tests.
 - **No coverage measurement.** Coverage tells you lines executed. Running the test
