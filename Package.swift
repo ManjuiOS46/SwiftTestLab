@@ -21,9 +21,13 @@ let package = Package(
             dependencies: ["SwiftTestLabKit"]
         ),
         .target(name: "SwiftTestLabKit"),
+        // Depends on the app target as well as the kit, so the app can be pointed
+        // at itself and generate a test for any of its own files. Without this the
+        // 15 files in Sources/SwiftTestLab could never produce a test that
+        // compiles, and the app correctly said so on every one of them.
         .testTarget(
             name: "SwiftTestLabKitTests",
-            dependencies: ["SwiftTestLabKit"]
+            dependencies: ["SwiftTestLabKit", "SwiftTestLab"]
         ),
     ]
 )
