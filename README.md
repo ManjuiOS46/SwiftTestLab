@@ -66,12 +66,66 @@ verification. Only the transport differs.
 | Cost | per token | nothing |
 
 Point Settings at a local runtime and press **Check**: the app asks the endpoint
-what it has loaded, lists it, and picks a coding-tuned model if it can find one —
-`qwen2.5-coder` beats a general chat model of the same size at this, noticeably.
-When the endpoint is local, the prompt preview says so, and nothing leaves the Mac.
+what it has loaded, lists it, and picks a coding-tuned model if it can find one.
+A coding-tuned model beats a general chat model of the same size at this,
+noticeably. When the endpoint is local, the prompt preview says so, and nothing
+leaves the Mac.
 
 Reasoning models that emit a `<think>` scratchpad inline are handled: the
 scratchpad is stripped, not written into your test file.
+
+### Setting up a local model
+
+The whole app works with no API key at all. From nothing to a first run, using
+Ollama — the runtime every number in this README was measured on:
+
+```bash
+brew install ollama
+```
+
+Start the server and leave it running:
+
+```bash
+ollama serve
+```
+
+Pull a coding model. `qwen3-coder:30b` is the one measured here; it is an 18 GB
+download and wants an Apple Silicon Mac with memory to match:
+
+```bash
+ollama pull qwen3-coder:30b
+```
+
+Confirm the endpoint is answering before you open the app:
+
+```bash
+curl -s http://localhost:11434/v1/models
+```
+
+Then in SwiftTestLab: **Settings (⌘,) → Open model → Ollama → Check**. It should
+report "Reachable" with the number of models loaded, and select a coding model.
+No key, nothing sent off the machine, nothing billed.
+
+Smaller models work the same way — `ollama pull qwen2.5-coder:7b` is a 4.7 GB
+alternative — but none of the measurements below were taken on one, so treat the
+rates in *Does it work?* as specific to the 30B.
+
+### Other runtimes
+
+Anything speaking the OpenAI chat-completions shape works. These four are presets
+in Settings; anything else, type the base URL yourself.
+
+| Runtime | Base URL | Start it with |
+|---|---|---|
+| Ollama | `http://localhost:11434/v1` | `ollama serve` |
+| LM Studio | `http://localhost:1234/v1` | Developer tab → Start Server |
+| llama.cpp | `http://localhost:8080/v1` | `llama-server -m <model.gguf>` |
+| vLLM | `http://localhost:8000/v1` | `vllm serve <model>` |
+
+If **Check** reports it can't reach the endpoint, the server isn't running or is
+on another port — the message names the address it tried and how to start that
+runtime. A hosted OpenAI-compatible gateway works too; a non-`localhost` address
+asks for a bearer token, stored in the Keychain like the Anthropic key.
 
 ---
 
@@ -112,7 +166,10 @@ logic behind the view is usually the better file to point at.
   deinit`, which was experimental before 6.2, and an older toolchain fails with
   an error that doesn't mention the version. The manifest declares 6.2 so
   SwiftPM says so plainly instead.
-- An Anthropic API key, **or** a local model server — either is enough
+- An Anthropic API key, **or** a local model server — either is enough. For the
+  local route see [Setting up a local model](#setting-up-a-local-model): it needs
+  Ollama (or another OpenAI-compatible server) and disk for the weights, 18 GB for
+  the model these measurements used.
 - No third-party dependencies. `URLSession` and `Process`, nothing else.
 
 ## Build and run
@@ -136,6 +193,9 @@ swift test
 ```
 
 ## Your API key
+
+Only needed for the hosted route. A model on `localhost` needs no key at all —
+see [Setting up a local model](#setting-up-a-local-model).
 
 Entered in Settings (`⌘,`), stored in the login Keychain, one item per provider so
 switching between them doesn't lose the other. It is never written to disk in plain
