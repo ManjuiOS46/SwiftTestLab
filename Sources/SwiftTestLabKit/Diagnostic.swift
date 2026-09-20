@@ -43,21 +43,59 @@ public enum DiagnosticParser {
             /^(?<path>[^\s:][^:]*\.swift):(?<line>\d+):(?<column>\d+): (?<severity>error|warning): (?<message>.+)$/
             .anchorsMatchLineEndings()
 
+        // Swift Testing is macros all the way down, so a diagnostic inside `#expect`
+        // is reported against the expansion buffer — "macro expansion #expect:1:61:
+        // warning: ..." — with no file or line the user could act on. The compiler
+        // follows it with a note giving the real location, which is what gets used.
+        let macroPattern = /^macro expansion [^:]+:\d+:\d+: (?<severity>error|warning): (?<message>.+)$/
+        let originPattern =
+            /(?<path>[^\s:][^:]*\.swift):(?<line>\d+):(?<column>\d+): note: expanded code originates here/
+
         var seen = Set<String>()
         var found: [Diagnostic] = []
 
-        for match in log.matches(of: pattern) {
-            guard let line = Int(match.line), let column = Int(match.column),
-                  let severity = Diagnostic.Severity(rawValue: String(match.severity)) else { continue }
-
-            let diagnostic = Diagnostic(
-                file: URL(filePath: String(match.path)).lastPathComponent,
-                line: line,
-                column: column,
-                severity: severity,
-                message: String(match.message).trimmingCharacters(in: .whitespaces)
-            )
+        func add(_ diagnostic: Diagnostic) {
             if seen.insert(diagnostic.id).inserted { found.append(diagnostic) }
+        }
+
+        let lines = log.split(separator: "\n", omittingEmptySubsequences: false)
+
+        for (index, line) in lines.enumerated() {
+            if let match = line.firstMatch(of: pattern) {
+                guard let number = Int(match.line), let column = Int(match.column),
+                      let severity = Diagnostic.Severity(rawValue: String(match.severity)) else { continue }
+                add(
+                    Diagnostic(
+                        file: URL(filePath: String(match.path)).lastPathComponent,
+                        line: number,
+                        column: column,
+                        severity: severity,
+                        message: String(match.message).trimmingCharacters(in: .whitespaces)
+                    )
+                )
+                continue
+            }
+
+            guard let macro = line.firstMatch(of: macroPattern),
+                  let severity = Diagnostic.Severity(rawValue: String(macro.severity)) else { continue }
+
+            // The note naming the real location follows within a line or two.
+            let lookahead = (index + 1)...min(index + 3, lines.count - 1)
+            guard lookahead.lowerBound <= lookahead.upperBound,
+                  let origin = lines[lookahead].lazy
+                    .compactMap({ $0.firstMatch(of: originPattern) })
+                    .first,
+                  let number = Int(origin.line), let column = Int(origin.column) else { continue }
+
+            add(
+                Diagnostic(
+                    file: URL(filePath: String(origin.path)).lastPathComponent,
+                    line: number,
+                    column: column,
+                    severity: severity,
+                    message: String(macro.message).trimmingCharacters(in: .whitespaces)
+                )
+            )
         }
 
         return found.sorted { left, right in

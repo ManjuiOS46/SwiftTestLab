@@ -277,6 +277,26 @@ checks for it instead of asking: a passing run that contains assertions which ar
 true by construction is reported as "Passed, but N assertions cannot fail", with
 the line and the reason. It is a warning, not a block — you decide.
 
+**The second example is only vacuous some of the time**, which is the interesting
+part. `#expect(throws: Never.self)` is the documented way to assert a success path,
+and against a function that really does throw it is a real test. It cannot fail
+only when the call cannot throw — and the source alone does not say which you have.
+The compiler does:
+
+```
+macro expansion #expect:1:61: warning: no calls to throwing functions occur within 'try' expression
+`- .../BrewerTests.swift:10:64: note: expanded code originates here
+```
+
+So no-throw assertions are judged on that warning rather than on the shape of the
+line, and a correct one is left alone. There's a test that builds a subject with a
+throwing method and a non-throwing one, asserts both the same way, and checks that
+exactly one is flagged.
+
+Mapping that warning back also fixed a quieter bug: Swift Testing is macros, so
+*any* diagnostic inside `#expect` is reported against the expansion buffer rather
+than your file. Those were being dropped from the Problems list entirely.
+
 ## Does it work?
 
 Measured, not assumed. Six subjects against `qwen3-coder:30b` running locally in

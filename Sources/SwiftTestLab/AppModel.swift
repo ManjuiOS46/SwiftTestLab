@@ -191,7 +191,15 @@ final class AppModel {
     /// Assertions in the generated test that are true by construction. A suite can
     /// pass every one of these and still be worthless.
     var vacuousAssertions: [VacuousAssertion] {
-        generatedTest?.vacuousAssertions ?? []
+        guard let test = generatedTest else { return [] }
+        guard let report else { return test.vacuousAssertions }
+        // With a build behind us, the compiler's own warnings settle the cases
+        // the source alone can't.
+        return AssertionAudit.vacuousAssertions(
+            in: test.source,
+            confirmedBy: report.diagnostics,
+            inFileNamed: report.testFileName
+        )
     }
 
     func copyTestToClipboard() {

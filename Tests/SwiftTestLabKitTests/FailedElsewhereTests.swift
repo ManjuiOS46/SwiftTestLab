@@ -63,3 +63,40 @@ import Testing
         #expect(!passing.failedElsewhere)
     }
 }
+
+/// Swift Testing is macros, so a diagnostic inside `#expect` is reported against
+/// the expansion buffer. Without mapping it back, those never reached the user.
+@Suite struct MacroDiagnosticTests {
+    private let log = """
+    [70 / 76] BreweryTests-product
+    macro expansion #expect:1:61: warning: no calls to throwing functions occur within 'try' expression [#UnnecessaryEffectMarker]
+    `- /tmp/Brewery/Tests/BreweryTests/BrewerTests.swift:10:64: note: expanded code originates here
+     9 |     @Test func announcingDoesNotThrow() {
+    10 |         #expect(throws: Never.self) { try Brewer().announce() }
+    """
+
+    @Test func mapsAMacroDiagnosticBackToTheRealFileAndLine() {
+        let found = DiagnosticParser.diagnostics(in: log)
+        #expect(found.count == 1)
+        #expect(found.first?.file == "BrewerTests.swift")
+        #expect(found.first?.line == 10)
+        #expect(found.first?.severity == .warning)
+        #expect(found.first?.message.contains("no calls to throwing functions") == true)
+    }
+
+    @Test func ignoresAMacroDiagnosticWithNoOriginNote() {
+        let orphan = """
+        macro expansion #expect:1:61: warning: no calls to throwing functions occur within 'try' expression
+        [71 / 76] Compiling something
+        """
+        #expect(DiagnosticParser.diagnostics(in: orphan).isEmpty)
+    }
+
+    @Test func ordinaryDiagnosticsStillParse() {
+        let plain = "/tmp/p/Tests/T/ModelsTests.swift:12:9: error: cannot find 'Widget' in scope"
+        let found = DiagnosticParser.diagnostics(in: plain)
+        #expect(found.count == 1)
+        #expect(found.first?.file == "ModelsTests.swift")
+        #expect(found.first?.severity == .error)
+    }
+}

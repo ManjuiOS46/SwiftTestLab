@@ -36,14 +36,6 @@ public enum AssertionAudit {
             reason: "comparing Void to Void is always true"
         ),
         Rule(
-            pattern: #"throws:\s*Never\.self"#,
-            reason: "asserting a non-throwing call doesn't throw is always true"
-        ),
-        Rule(
-            pattern: #"XCTAssertNoThrow\("#,
-            reason: "asserting a non-throwing call doesn't throw is always true"
-        ),
-        Rule(
             pattern: #"#expect\([^)\n]*\bis\s+[A-Z][A-Za-z0-9_]*\s*\)"#,
             reason: "a value is always the type it was constructed as"
         ),
@@ -65,11 +57,18 @@ public enum AssertionAudit {
         ),
     ]
 
+    /// Assertions that are unfailable on the face of the source.
+    ///
+    /// `#expect(throws: Never.self)` and `XCTAssertNoThrow` deliberately aren't
+    /// here. Both are correct and useful against a function that really does
+    /// throw — the Swift Testing documentation teaches the first as the way to
+    /// assert a success path. They are vacuous only when the call cannot throw,
+    /// which the source alone does not say. Use `confirmedBy:` for those.
     public static func vacuousAssertions(in source: String) -> [VacuousAssertion] {
         var found: [VacuousAssertion] = []
 
-        for (offset, line) in source.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
-            let text = String(line).trimmingCharacters(in: .whitespaces)
+        for (offset, line) in lines(of: source).enumerated() {
+            let text = line.trimmingCharacters(in: .whitespaces)
             guard text.contains("#expect") || text.contains("XCTAssert") else { continue }
 
             for rule in rules {
@@ -82,6 +81,52 @@ public enum AssertionAudit {
         }
 
         return found
+    }
+
+    /// The above, plus no-throw assertions the compiler has shown to be pointless.
+    ///
+    /// When a test says a call doesn't throw and the call cannot throw, the
+    /// compiler says so itself: `no calls to throwing functions occur within 'try'
+    /// expression`. That warning is proof, where a pattern in the source is only a
+    /// guess, so it is what the no-throw case is judged on.
+    public static func vacuousAssertions(
+        in source: String,
+        confirmedBy diagnostics: [Diagnostic],
+        inFileNamed fileName: String? = nil
+    ) -> [VacuousAssertion] {
+        var found = vacuousAssertions(in: source)
+        let sourceLines = lines(of: source)
+
+        for diagnostic in diagnostics where diagnostic.severity == .warning {
+            guard diagnostic.message.contains("no calls to throwing functions occur") else { continue }
+            if let fileName, diagnostic.file != fileName { continue }
+
+            // The warning points at the `try`; the assertion wrapping it may be on
+            // that line or just above it.
+            let index = diagnostic.line - 1
+            guard sourceLines.indices.contains(index) else { continue }
+
+            let window = stride(from: index, through: max(0, index - 2), by: -1)
+            guard let assertionIndex = window.first(where: { candidate in
+                let text = sourceLines[candidate]
+                return text.contains("Never.self") || text.contains("XCTAssertNoThrow")
+            }) else { continue }
+
+            let assertion = VacuousAssertion(
+                line: assertionIndex + 1,
+                text: sourceLines[assertionIndex].trimmingCharacters(in: .whitespaces),
+                reason: "the compiler reports this call cannot throw, so asserting it doesn't throw cannot fail"
+            )
+            if !found.contains(where: { $0.line == assertion.line }) {
+                found.append(assertion)
+            }
+        }
+
+        return found.sorted { $0.line < $1.line }
+    }
+
+    private static func lines(of source: String) -> [String] {
+        source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
     }
 }
 
